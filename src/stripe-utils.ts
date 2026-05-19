@@ -1,8 +1,12 @@
 import type Stripe from "stripe";
 import { createClerkClient } from "@clerk/backend";
 
-export type SubTier = "standard" | "pro";
+export type SubTier = "starter" | "standard" | "pro" | "unlimited";
 type ClerkClient = ReturnType<typeof createClerkClient>;
+
+const VALID_SUB_TIERS: ReadonlySet<string> = new Set<SubTier>([
+  "starter", "standard", "pro", "unlimited",
+]);
 
 export function decideTierForEvent(
   mappedTier: SubTier | null,
@@ -22,7 +26,7 @@ export async function getExistingTier(
   const user = await clerk.users.getUser(clerkUserId);
   const meta = (user.publicMetadata as Record<string, unknown>) || {};
   const t = meta[tierKey] ?? (legacyTierKey ? meta[legacyTierKey] : undefined);
-  return t === "pro" || t === "standard" ? t : null;
+  return typeof t === "string" && VALID_SUB_TIERS.has(t) ? (t as SubTier) : null;
 }
 
 export async function syncToClerk(
