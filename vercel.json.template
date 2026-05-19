@@ -1,0 +1,28 @@
+{
+  "framework": "astro",
+  "installCommand": "rm -rf vault core .git/modules/vault .git/modules/core && git submodule sync && git config --global url.\"https://x-access-token:${VAULT_GIT_TOKEN}@github.com/\".insteadOf \"https://github.com/\" && git submodule update --init --recursive && npm install",
+  "crons": [
+    {
+      "path": "/api/cron/export-questions",
+      "schedule": "5 1 * * *"
+    }
+  ],
+  "redirects": [],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(self)" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.TOPIC.knowledgebricks.com https://js.stripe.com https://us-assets.i.posthog.com https://us.i.posthog.com https://browser.sentry-cdn.com https://js.sentry-cdn.com; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://clerk-telemetry.com https://clerk.TOPIC.knowledgebricks.com https://*.supabase.co https://api.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com https://cdn.fontshare.com; font-src 'self' data: https://fonts.gstatic.com https://api.fontshare.com https://cdn.fontshare.com; frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://checkout.stripe.com; object-src 'none'"
+        }
+      ]
+    }
+  ]
+}
