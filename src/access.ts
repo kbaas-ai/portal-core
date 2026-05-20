@@ -1,5 +1,11 @@
 import { createClerkClient } from "@clerk/backend";
-import { TIERS, type TierSlug } from "./tiers.js";
+import {
+  TIERS,
+  LEGACY_SLUG_MAP,
+  normalizeTierSlug,
+  type TierSlug,
+  type AnyTierSlug,
+} from "./tiers.js";
 
 export type ContentTier = "free" | "paid";
 export type PlanSlug = "paid";
@@ -54,6 +60,12 @@ function getEnv(name: string): string | undefined {
     : undefined;
   return fromMeta || (typeof process !== "undefined" ? process.env?.[name] : undefined);
 }
+
+// All known slugs (active + legacy) for input validation.
+const ALL_KNOWN_SLUGS = new Set<string>([
+  "free", "advisor", "principal", "enterprise",
+  "starter", "standard", "pro", "unlimited",
+]);
 
 // Caches keyed by `${topic}:${userId}` (topic-scoped) or `${userId}` / domain.
 const userMetaCache = new Map<string, { tier: "paid" | null; ts: number }>();
@@ -186,6 +198,11 @@ function tierFromSessionClaims(auth: ClerkAuth, cfg: TopicConfig): "paid" | null
 
 function hasPlan(auth: ClerkAuth): boolean {
   return (
+    // Active slugs
+    auth.has({ plan: "advisor" }) ||
+    auth.has({ plan: "principal" }) ||
+    auth.has({ plan: "enterprise" }) ||
+    // Legacy slugs (kept during transition window)
     auth.has({ plan: "pro" }) ||
     auth.has({ plan: "reader_pro" }) ||
     auth.has({ plan: "standard" }) ||
@@ -220,10 +237,7 @@ export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<"p
   return tier === "free" ? null : "paid";
 }
 
-const KNOWN_TIER_SLUGS: ReadonlySet<TierSlug> = new Set<TierSlug>([
-  "free", "starter", "standard", "pro", "unlimited",
-]);
-
+// Returns the normalized active TierSlug for the user (used for feature gating and rate limits).
 export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<TierSlug> {
   if (!auth.userId) return "free";
 
@@ -232,8 +246,10 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
   const statusKey = `${cfg.topic}_subscription_status`;
   const claimTier = meta[tierKey] ?? (cfg.legacyTierKey ? meta[cfg.legacyTierKey] : undefined);
   const claimStatus = meta[statusKey] ?? (cfg.legacyStatusKey ? meta[cfg.legacyStatusKey] : undefined);
-  if (claimTier && KNOWN_TIER_SLUGS.has(claimTier as TierSlug)) {
-    if (!claimStatus || ACTIVE_STATUSES.has(claimStatus)) return claimTier as TierSlug;
+  if (claimTier && ALL_KNOWN_SLUGS.has(claimTier)) {
+    if (!claimStatus || ACTIVE_STATUSES.has(claimStatus)) {
+      return normalizeTierSlug(claimTier);
+    }
   }
 
   const secretKey = getEnv("CLERK_SECRET_KEY");
@@ -244,16 +260,40 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
       const m = (user.publicMetadata || {}) as Record<string, string | undefined>;
       const mTier = m[`${cfg.topic}_subscription_tier`] ?? (cfg.legacyTierKey ? m[cfg.legacyTierKey] : undefined);
       const mStatus = m[`${cfg.topic}_subscription_status`] ?? (cfg.legacyStatusKey ? m[cfg.legacyStatusKey] : undefined);
-      if (mTier && KNOWN_TIER_SLUGS.has(mTier as TierSlug)) {
-        if (!mStatus || ACTIVE_STATUSES.has(mStatus)) return mTier as TierSlug;
+      if (mTier && ALL_KNOWN_SLUGS.has(mTier)) {
+        if (!mStatus || ACTIVE_STATUSES.has(mStatus)) return normalizeTierSlug(mTier);
       }
     } catch { /* fall through */ }
   }
 
-  return await getUserTier(auth, cfg);
+  const contentTier = await getUserTier(auth, cfg);
+  return contentTier === "free" ? "free" : "advisor";
 }
 
-// Display labels
+// ---------- Feature gates ----------
+
+export function canUseSkills(tier: AnyTierSlug | null | undefined): boolean {
+  const normalized = tier ? normalizeTierSlug(tier) : "free";
+  return normalized === "principal" || normalized === "enterprise";
+}
+
+export function canUseChat(tier: AnyTierSlug | null | undefined): boolean {
+  const normalized = tier ? normalizeTierSlug(tier) : "free";
+  return normalized === "principal" || normalized === "enterprise";
+}
+
+export function canUseConsult(tier: AnyTierSlug | null | undefined): boolean {
+  const normalized = tier ? normalizeTierSlug(tier) : "free";
+  return normalized === "enterprise";
+}
+
+export function unlocksProContentForTier(tier: AnyTierSlug | null | undefined): boolean {
+  if (!tier || tier === "free") return false;
+  return true;
+}
+
+// ---------- Display helpers ----------
+
 export const PLAN_DISPLAY: Record<PlanSlug | "free", string> = {
   free: "Free",
   paid: "Advisor",
@@ -266,23 +306,10 @@ export const TIER_DISPLAY: Record<ContentTier, string> = {
 
 const FREE_TIER = TIERS.find((t) => t.slug === "free")!;
 
-export function monthlyQueryLimitForTier(tier: TierSlug | null | undefined): number {
-  if (tier === "standard") {
-    const pro = TIERS.find((t) => t.slug === "pro");
-    if (pro) return pro.monthlyQueryLimit;
-  }
-  const match = TIERS.find((t) => t.slug === tier);
+export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): number {
+  const normalized = tier ? normalizeTierSlug(tier) : "free";
+  const match = TIERS.find((t) => t.slug === normalized);
   return (match ?? FREE_TIER).monthlyQueryLimit;
 }
 
-export function canUseSkills(tier: TierSlug | null | undefined): boolean {
-  return tier === "unlimited";
-}
-
-export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
-  if (!tier || tier === "free") return false;
-  // Any active paid subscription (starter, pro, unlimited, or legacy standard) unlocks content.
-  return true;
-}
-
-export type { TierSlug } from "./tiers.js";
+export type { TierSlug, AnyTierSlug } from "./tiers.js";

@@ -1,20 +1,25 @@
 import type Stripe from "stripe";
 import { createClerkClient } from "@clerk/backend";
+import { normalizeTierSlug, type TierSlug, type AnyTierSlug } from "./tiers.js";
 
-export type SubTier = "starter" | "standard" | "pro" | "unlimited";
+// SubTier is the set of slugs that can come in from Stripe price metadata.
+// Includes both active and legacy slugs — normalizeTierSlug handles the mapping.
+export type SubTier = AnyTierSlug;
+
 type ClerkClient = ReturnType<typeof createClerkClient>;
 
-const VALID_SUB_TIERS: ReadonlySet<string> = new Set<SubTier>([
+const ALL_KNOWN_SLUGS: ReadonlySet<string> = new Set<string>([
+  "free", "advisor", "principal", "enterprise",
   "starter", "standard", "pro", "unlimited",
 ]);
 
 export function decideTierForEvent(
   mappedTier: SubTier | null,
   existingTier: SubTier | null,
-): { tier: SubTier; reason: "mapped" | "preserved" | "defaulted" } {
-  if (mappedTier) return { tier: mappedTier, reason: "mapped" };
-  if (existingTier) return { tier: existingTier, reason: "preserved" };
-  return { tier: "pro", reason: "defaulted" };
+): { tier: TierSlug; reason: "mapped" | "preserved" | "defaulted" } {
+  if (mappedTier) return { tier: normalizeTierSlug(mappedTier), reason: "mapped" };
+  if (existingTier) return { tier: normalizeTierSlug(existingTier), reason: "preserved" };
+  return { tier: "principal", reason: "defaulted" };
 }
 
 export async function getExistingTier(
@@ -26,7 +31,7 @@ export async function getExistingTier(
   const user = await clerk.users.getUser(clerkUserId);
   const meta = (user.publicMetadata as Record<string, unknown>) || {};
   const t = meta[tierKey] ?? (legacyTierKey ? meta[legacyTierKey] : undefined);
-  return typeof t === "string" && VALID_SUB_TIERS.has(t) ? (t as SubTier) : null;
+  return typeof t === "string" && ALL_KNOWN_SLUGS.has(t) ? (t as SubTier) : null;
 }
 
 export async function syncToClerk(
