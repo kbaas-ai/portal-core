@@ -1,8 +1,8 @@
 import { createClerkClient } from "@clerk/backend";
 import { TIERS, type TierSlug } from "./tiers.js";
 
-export type ContentTier = "free" | "standard" | "pro";
-export type PlanSlug = "standard" | "pro";
+export type ContentTier = "free" | "paid";
+export type PlanSlug = "paid";
 export type Tier = ContentTier;
 
 /**
@@ -20,8 +20,7 @@ export type TopicConfig = {
 
 export const TIER_RANK: Record<Tier, number> = {
   free: 0,
-  standard: 1,
-  pro: 2,
+  paid: 1,
 } as const;
 
 export function hasAccess(userTier: Tier, requiredTier: Tier): boolean {
@@ -57,9 +56,9 @@ function getEnv(name: string): string | undefined {
 }
 
 // Caches keyed by `${topic}:${userId}` (topic-scoped) or `${userId}` / domain.
-const userMetaCache = new Map<string, { tier: PlanSlug | null; ts: number }>();
+const userMetaCache = new Map<string, { tier: "paid" | null; ts: number }>();
 const userEmailCache = new Map<string, { email: string | null; ts: number }>();
-const compDomainCache = new Map<string, { tier: PlanSlug | null; ts: number }>();
+const compDomainCache = new Map<string, { tier: "paid" | null; ts: number }>();
 const META_CACHE_MS = 5_000;
 
 function claimsMetadata(auth: ClerkAuth): Record<string, string | undefined> {
@@ -80,7 +79,7 @@ function getPrimaryEmail(user: {
   return primary?.emailAddress?.toLowerCase() || null;
 }
 
-async function tierFromClerkAPI(userId: string, cfg: TopicConfig): Promise<PlanSlug | null> {
+async function tierFromClerkAPI(userId: string, cfg: TopicConfig): Promise<"paid" | null> {
   const cacheKey = `${cfg.topic}:${userId}`;
   const cached = userMetaCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < META_CACHE_MS) return cached.tier;
@@ -103,7 +102,7 @@ async function tierFromClerkAPI(userId: string, cfg: TopicConfig): Promise<PlanS
       userEmailCache.set(userId, { email: getPrimaryEmail(user), ts: Date.now() });
       return null;
     }
-    const tier = rawTier === "pro" || rawTier === "standard" ? (rawTier as PlanSlug) : null;
+    const tier: "paid" | null = (rawTier && rawTier !== "free") ? "paid" : null;
     userMetaCache.set(cacheKey, { tier, ts: Date.now() });
     userEmailCache.set(userId, { email: getPrimaryEmail(user), ts: Date.now() });
     return tier;
@@ -140,7 +139,7 @@ function domainFromEmail(email: string | null): string | null {
   return domain;
 }
 
-async function tierFromCompDomain(userId: string): Promise<PlanSlug | null> {
+async function tierFromCompDomain(userId: string): Promise<"paid" | null> {
   const email = await emailForUser(userId);
   const domain = domainFromEmail(email);
   if (!domain) return null;
@@ -165,7 +164,7 @@ async function tierFromCompDomain(userId: string): Promise<PlanSlug | null> {
     if (!res.ok) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
     const rows = (await res.json()) as Array<{ tier?: string }>;
     const raw = rows[0]?.tier;
-    const tier: PlanSlug | null = raw === "pro" || raw === "standard" ? (raw as PlanSlug) : null;
+    const tier: "paid" | null = (raw && raw !== "free") ? "paid" : null;
     compDomainCache.set(domain, { tier, ts: Date.now() });
     return tier;
   } catch {
@@ -174,21 +173,26 @@ async function tierFromCompDomain(userId: string): Promise<PlanSlug | null> {
   }
 }
 
-function tierFromSessionClaims(auth: ClerkAuth, cfg: TopicConfig): PlanSlug | null {
+function tierFromSessionClaims(auth: ClerkAuth, cfg: TopicConfig): "paid" | null {
   const meta = claimsMetadata(auth);
   const tierKey = `${cfg.topic}_subscription_tier`;
   const statusKey = `${cfg.topic}_subscription_status`;
   const tier = meta[tierKey] ?? (cfg.legacyTierKey ? meta[cfg.legacyTierKey] : undefined);
   const status = meta[statusKey] ?? (cfg.legacyStatusKey ? meta[cfg.legacyStatusKey] : undefined);
-  if (!tier) return null;
+  if (!tier || tier === "free") return null;
   if (status && !ACTIVE_STATUSES.has(status)) return null;
-  if (tier === "pro" || tier === "standard") return tier;
-  return null;
+  return "paid";
 }
 
-function hasPlan(auth: ClerkAuth, plan: PlanSlug): boolean {
-  if (plan === "pro") return auth.has({ plan: "pro" }) || auth.has({ plan: "reader_pro" });
-  return auth.has({ plan: "standard" }) || auth.has({ plan: "reader_basic" });
+function hasPlan(auth: ClerkAuth): boolean {
+  return (
+    auth.has({ plan: "pro" }) ||
+    auth.has({ plan: "reader_pro" }) ||
+    auth.has({ plan: "standard" }) ||
+    auth.has({ plan: "reader_basic" }) ||
+    auth.has({ plan: "starter" }) ||
+    auth.has({ plan: "unlimited" })
+  );
 }
 
 export async function getUserTier(auth: ClerkAuth, cfg: TopicConfig): Promise<Tier> {
@@ -199,8 +203,7 @@ export async function getUserTier(auth: ClerkAuth, cfg: TopicConfig): Promise<Ti
   if (fromApi) return fromApi;
   const fromComp = await tierFromCompDomain(auth.userId);
   if (fromComp) return fromComp;
-  if (hasPlan(auth, "pro")) return "pro";
-  if (hasPlan(auth, "standard")) return "standard";
+  if (hasPlan(auth)) return "paid";
   return "free";
 }
 
@@ -212,9 +215,9 @@ export function canRead(userTiers: ContentTier[], pageTier: ContentTier): boolea
   return userTiers.includes(pageTier);
 }
 
-export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<PlanSlug | null> {
+export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<"paid" | null> {
   const tier = await getUserTier(auth, cfg);
-  return tier === "free" ? null : tier;
+  return tier === "free" ? null : "paid";
 }
 
 const KNOWN_TIER_SLUGS: ReadonlySet<TierSlug> = new Set<TierSlug>([
@@ -253,14 +256,12 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
 // Display labels
 export const PLAN_DISPLAY: Record<PlanSlug | "free", string> = {
   free: "Free",
-  standard: "Support",
-  pro: "Advisor",
+  paid: "Advisor",
 };
 
 export const TIER_DISPLAY: Record<ContentTier, string> = {
   free: "Free",
-  standard: "Support",
-  pro: "Advisor",
+  paid: "Advisor",
 };
 
 const FREE_TIER = TIERS.find((t) => t.slug === "free")!;
@@ -279,9 +280,9 @@ export function canUseSkills(tier: TierSlug | null | undefined): boolean {
 }
 
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
-  if (tier === "standard") return true;
-  const match = TIERS.find((t) => t.slug === tier);
-  return (match ?? FREE_TIER).unlocksProContent;
+  if (!tier || tier === "free") return false;
+  // Any active paid subscription (starter, pro, unlimited, or legacy standard) unlocks content.
+  return true;
 }
 
 export type { TierSlug } from "./tiers.js";
