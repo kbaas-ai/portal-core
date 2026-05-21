@@ -280,17 +280,17 @@ export function monthlyQueryLimitForTier(tier: TierSlug | null | undefined): num
 }
 
 export function canUseSkills(tier: TierSlug | null | undefined): boolean {
-  return tier === "principal" || tier === "unlimited";
+  return tier === "principal" || tier === "team";
 }
 
 // Workflows and coached sessions — Principal tier and above.
 export function canUseChat(tier: string | null | undefined): boolean {
-  return tier === "principal" || tier === "unlimited" || tier === "enterprise";
+  return tier === "principal" || tier === "team";
 }
 
 // Engagement Hub / consult features — Principal tier and above.
 export function canUseConsult(tier: string | null | undefined): boolean {
-  return tier === "principal" || tier === "unlimited" || tier === "enterprise";
+  return tier === "principal" || tier === "team";
 }
 
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {

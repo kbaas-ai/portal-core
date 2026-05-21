@@ -15,9 +15,9 @@ export type TierSlug =
 
 export type PaidTierSlug = Exclude<TierSlug, "free">;
 
-// AnyTierSlug extends TierSlug with "enterprise" for team/org accounts that
+// AnyTierSlug extends TierSlug with "team" for team/org accounts that
 // are managed outside the self-serve Stripe flow.
-export type AnyTierSlug = TierSlug | "enterprise";
+export type AnyTierSlug = TierSlug | "team";
 
 export type TierConfig = {
   slug: TierSlug;
@@ -81,8 +81,9 @@ export function normalizeTierSlug(slug: string): AnyTierSlug {
   if (slug === "principal") return "principal";
   if (slug === "starter" || slug === "standard" || slug === "pro") return "advisor";
   if (slug === "unlimited") return "principal";
-  if (slug === "enterprise") return "enterprise";
-  const known = new Set<string>(["free", "advisor", "principal", "enterprise"]);
+  if (slug === "team") return "team";
+  if (slug === "enterprise") return "team"; // legacy alias
+  const known = new Set<string>(["free", "advisor", "principal", "team"]);
   return (known.has(slug) ? slug : "free") as AnyTierSlug;
 }
 
