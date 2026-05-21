@@ -8,13 +8,30 @@ const VALID_SUB_TIERS: ReadonlySet<string> = new Set<SubTier>([
   "advisor", "principal", "starter", "standard", "pro", "unlimited",
 ]);
 
+// Maps any legacy or current tier slug to the canonical active slug for comparison.
+// "pro" → "advisor", "unlimited" → "principal"; canonical slugs are unchanged.
+const CANONICAL_TIER: Record<string, SubTier> = {
+  advisor: "advisor",
+  principal: "principal",
+  starter: "advisor",
+  standard: "advisor",
+  pro: "advisor",
+  unlimited: "principal",
+};
+
 export function decideTierForEvent(
   mappedTier: SubTier | null,
   existingTier: SubTier | null,
-): { tier: SubTier; reason: "mapped" | "preserved" | "defaulted" } {
+): { tier: SubTier | null; reason: "mapped" | "preserved" | "unmapped" } {
   if (mappedTier) return { tier: mappedTier, reason: "mapped" };
-  if (existingTier) return { tier: existingTier, reason: "preserved" };
-  return { tier: "pro", reason: "defaulted" };
+  // Preserve the existing tier only if it's a real paid slug — not a legacy
+  // catch-all. "pro" was the old hardcoded default and must not be preserved
+  // blindly; callers should re-verify against Stripe before trusting it.
+  const canonical = existingTier ? CANONICAL_TIER[existingTier] : null;
+  if (canonical === "advisor" || canonical === "principal") {
+    return { tier: existingTier, reason: "preserved" };
+  }
+  return { tier: null, reason: "unmapped" };
 }
 
 export async function getExistingTier(
