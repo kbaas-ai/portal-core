@@ -279,6 +279,16 @@ export function canUseSkills(tier: TierSlug | null | undefined): boolean {
   return tier === "unlimited";
 }
 
+// Workflows and coached sessions — Principal (unlimited) and above.
+export function canUseChat(tier: string | null | undefined): boolean {
+  return tier === "unlimited" || tier === "enterprise";
+}
+
+// Engagement Hub / consult features — enterprise accounts only.
+export function canUseConsult(tier: string | null | undefined): boolean {
+  return tier === "enterprise";
+}
+
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
   if (!tier || tier === "free") return false;
   // Any active paid subscription (starter, pro, unlimited, or legacy standard) unlocks content.
