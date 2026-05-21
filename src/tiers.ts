@@ -21,7 +21,7 @@ export type TierConfig = {
   stripeProductDescription?: string;
 };
 
-// Active plans for sale. Legacy slugs (starter, pro) are kept in TierSlug for
+// Active plans for sale. Legacy slugs (starter, standard) are kept in TierSlug for
 // backwards compatibility with existing subscribers, but are not shown in the UI.
 export const TIERS: readonly TierConfig[] = [
   {
@@ -31,6 +31,15 @@ export const TIERS: readonly TierConfig[] = [
     monthlyQueryLimit: 2,
     unlocksProContent: false,
     skipStripe: true,
+  },
+  {
+    slug: "pro",
+    displayName: "Advisor",
+    monthlyPriceCents: 4900,
+    monthlyQueryLimit: 50,
+    unlocksProContent: true,
+    stripeProductDescription:
+      "KnowledgeBricks Advisor — 50 Ask-a-SME queries/month and full practitioner content library.",
   },
   {
     slug: "unlimited",
