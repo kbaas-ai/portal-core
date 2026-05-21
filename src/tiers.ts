@@ -21,43 +21,35 @@ export type TierConfig = {
   stripeProductDescription?: string;
 };
 
-// Active plans for sale. Legacy slugs (starter, standard) are kept in TierSlug for
-// backwards compatibility with existing subscribers, but are not shown in the UI.
+// Active plans for sale. Legacy slugs (starter, standard, unlimited) are kept
+// in TierSlug for Stripe back-compat but are not shown in the UI. New subscribers
+// should only be on free or pro (Practitioner).
 export const TIERS: readonly TierConfig[] = [
   {
     slug: "free",
-    displayName: "Free",
+    displayName: "Free Trial",
     monthlyPriceCents: 0,
-    monthlyQueryLimit: 2,
+    monthlyQueryLimit: 5,
     unlocksProContent: false,
     skipStripe: true,
   },
   {
     slug: "pro",
-    displayName: "Advisor",
-    monthlyPriceCents: 4900,
-    monthlyQueryLimit: 50,
-    unlocksProContent: true,
-    stripeProductDescription:
-      "KnowledgeBricks Advisor — 50 Ask-a-SME queries/month and full practitioner content library.",
-  },
-  {
-    slug: "unlimited",
-    displayName: "Principal",
+    displayName: "Practitioner",
     monthlyPriceCents: 14900,
     annualPriceCents: 149000,
-    monthlyQueryLimit: 1000,
+    monthlyQueryLimit: 9999,
     unlocksProContent: true,
     stripeProductDescription:
-      "KnowledgeBricks Principal — unlimited queries, SME coaching workflows, and full practitioner content library.",
+      "KnowledgeBricks Practitioner — unlimited queries and the full practitioner skills suite.",
   },
 ] as const;
 
 export function getTierDisplayName(slug: TierSlug): string {
-  if (slug === "standard" || slug === "starter") return "Support";
-  if (slug === "pro") return "Advisor";
+  if (slug === "standard" || slug === "starter") return "Practitioner";
+  if (slug === "pro" || slug === "unlimited") return "Practitioner";
   const match = TIERS.find((t) => t.slug === slug);
-  return match?.displayName ?? "Free";
+  return match?.displayName ?? "Free Trial";
 }
 
 // Maps legacy or variant slugs to the canonical active slug.
