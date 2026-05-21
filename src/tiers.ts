@@ -3,7 +3,7 @@
 // To change prices or query allowances: edit TIERS, re-run the Stripe
 // bootstrap with --apply, and mirror the change in each portal's RUNBOOK.md.
 
-export type TierSlug = "free" | "starter" | "standard" | "pro" | "unlimited";
+export type TierSlug = "free" | "starter" | "standard" | "advisor" | "pro" | "unlimited";
 export type PaidTierSlug = Exclude<TierSlug, "free">;
 
 // AnyTierSlug extends TierSlug with "enterprise" for team/org accounts that
@@ -34,6 +34,15 @@ export const TIERS: readonly TierConfig[] = [
     skipStripe: true,
   },
   {
+    slug: "advisor",
+    displayName: "Advisor",
+    monthlyPriceCents: 4900,
+    monthlyQueryLimit: 50,
+    unlocksProContent: true,
+    stripeProductDescription:
+      "KnowledgeBricks Advisor — 50 queries/month and full practitioner content access.",
+  },
+  {
     slug: "pro",
     displayName: "Practitioner",
     monthlyPriceCents: 14900,
@@ -48,6 +57,7 @@ export const TIERS: readonly TierConfig[] = [
 export function getTierDisplayName(slug: TierSlug): string {
   if (slug === "standard" || slug === "starter") return "Practitioner";
   if (slug === "pro" || slug === "unlimited") return "Practitioner";
+  if (slug === "advisor") return "Advisor";
   const match = TIERS.find((t) => t.slug === slug);
   return match?.displayName ?? "Free Trial";
 }
@@ -57,7 +67,7 @@ export function getTierDisplayName(slug: TierSlug): string {
 // re-launched — it maps to "pro" (same query allowance + content access).
 export function normalizeTierSlug(slug: string): AnyTierSlug {
   if (slug === "standard") return "pro";
-  const known = new Set<string>(["free", "starter", "standard", "pro", "unlimited", "enterprise"]);
+  const known = new Set<string>(["free", "starter", "standard", "advisor", "pro", "unlimited", "enterprise"]);
   return (known.has(slug) ? slug : "free") as AnyTierSlug;
 }
 
