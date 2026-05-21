@@ -3,7 +3,16 @@
 // To change prices or query allowances: edit TIERS, re-run the Stripe
 // bootstrap with --apply, and mirror the change in each portal's RUNBOOK.md.
 
-export type TierSlug = "free" | "starter" | "standard" | "advisor" | "pro" | "unlimited";
+export type TierSlug =
+  | "free"
+  | "advisor"
+  | "principal"
+  // Legacy slugs — kept in TierSlug for Stripe back-compat; not shown in UI.
+  | "starter"
+  | "standard"
+  | "pro"
+  | "unlimited";
+
 export type PaidTierSlug = Exclude<TierSlug, "free">;
 
 // AnyTierSlug extends TierSlug with "enterprise" for team/org accounts that
@@ -21,9 +30,9 @@ export type TierConfig = {
   stripeProductDescription?: string;
 };
 
-// Active plans for sale. Legacy slugs (starter, standard, unlimited) are kept
-// in TierSlug for Stripe back-compat but are not shown in the UI. New subscribers
-// should only be on free or pro (Practitioner).
+// Active plans for sale. Legacy slugs (starter, standard, pro, unlimited) are
+// kept in TierSlug for Stripe back-compat but are not shown in the UI.
+// New subscribers should only be on free, advisor, or principal.
 export const TIERS: readonly TierConfig[] = [
   {
     slug: "free",
@@ -37,37 +46,43 @@ export const TIERS: readonly TierConfig[] = [
     slug: "advisor",
     displayName: "Advisor",
     monthlyPriceCents: 4900,
+    annualPriceCents: 49000,
     monthlyQueryLimit: 50,
     unlocksProContent: true,
     stripeProductDescription:
-      "KnowledgeBricks Advisor — 50 queries/month and full practitioner content access.",
+      "KnowledgeBricks Advisor — 50 queries/month and the full practitioner content library.",
   },
   {
-    slug: "pro",
-    displayName: "Practitioner",
+    slug: "principal",
+    displayName: "Principal",
     monthlyPriceCents: 14900,
     annualPriceCents: 149000,
     monthlyQueryLimit: 9999,
     unlocksProContent: true,
     stripeProductDescription:
-      "KnowledgeBricks Practitioner — unlimited queries and the full practitioner skills suite.",
+      "KnowledgeBricks Principal — unlimited queries, full content library, and every practitioner skill.",
   },
 ] as const;
 
-export function getTierDisplayName(slug: TierSlug): string {
-  if (slug === "standard" || slug === "starter") return "Practitioner";
-  if (slug === "pro" || slug === "unlimited") return "Practitioner";
+export function getTierDisplayName(slug: TierSlug | string): string {
+  // Canonical slugs
   if (slug === "advisor") return "Advisor";
+  if (slug === "principal") return "Principal";
+  // Legacy slug display names
+  if (slug === "starter" || slug === "standard" || slug === "pro") return "Advisor";
+  if (slug === "unlimited") return "Principal";
   const match = TIERS.find((t) => t.slug === slug);
   return match?.displayName ?? "Free Trial";
 }
 
 // Maps legacy or variant slugs to the canonical active slug.
-// "standard" was an early alias used before the logistics portal was
-// re-launched — it maps to "pro" (same query allowance + content access).
 export function normalizeTierSlug(slug: string): AnyTierSlug {
-  if (slug === "standard") return "pro";
-  const known = new Set<string>(["free", "starter", "standard", "advisor", "pro", "unlimited", "enterprise"]);
+  if (slug === "advisor") return "advisor";
+  if (slug === "principal") return "principal";
+  if (slug === "starter" || slug === "standard" || slug === "pro") return "advisor";
+  if (slug === "unlimited") return "principal";
+  if (slug === "enterprise") return "enterprise";
+  const known = new Set<string>(["free", "advisor", "principal", "enterprise"]);
   return (known.has(slug) ? slug : "free") as AnyTierSlug;
 }
 

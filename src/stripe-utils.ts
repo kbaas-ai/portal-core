@@ -1,11 +1,11 @@
 import type Stripe from "stripe";
 import { createClerkClient } from "@clerk/backend";
 
-export type SubTier = "starter" | "standard" | "pro" | "unlimited";
+export type SubTier = "advisor" | "principal" | "starter" | "standard" | "pro" | "unlimited";
 type ClerkClient = ReturnType<typeof createClerkClient>;
 
 const VALID_SUB_TIERS: ReadonlySet<string> = new Set<SubTier>([
-  "starter", "standard", "pro", "unlimited",
+  "advisor", "principal", "starter", "standard", "pro", "unlimited",
 ]);
 
 export function decideTierForEvent(

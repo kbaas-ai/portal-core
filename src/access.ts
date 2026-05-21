@@ -186,6 +186,8 @@ function tierFromSessionClaims(auth: ClerkAuth, cfg: TopicConfig): "paid" | null
 
 function hasPlan(auth: ClerkAuth): boolean {
   return (
+    auth.has({ plan: "advisor" }) ||
+    auth.has({ plan: "principal" }) ||
     auth.has({ plan: "pro" }) ||
     auth.has({ plan: "reader_pro" }) ||
     auth.has({ plan: "standard" }) ||
@@ -221,7 +223,7 @@ export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<"p
 }
 
 const KNOWN_TIER_SLUGS: ReadonlySet<TierSlug> = new Set<TierSlug>([
-  "free", "starter", "standard", "pro", "unlimited",
+  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited",
 ]);
 
 export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<TierSlug> {
@@ -253,40 +255,42 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
   return await getUserTier(auth, cfg);
 }
 
-// Display labels
+// Display labels for the binary ContentTier (free/paid).
+// Pages that need per-slug display names should use getTierDisplayName() from tiers.ts.
 export const PLAN_DISPLAY: Record<PlanSlug | "free", string> = {
   free: "Free",
-  paid: "Advisor",
+  paid: "Paid",
 };
 
 export const TIER_DISPLAY: Record<ContentTier, string> = {
   free: "Free",
-  paid: "Advisor",
+  paid: "Paid",
 };
 
 const FREE_TIER = TIERS.find((t) => t.slug === "free")!;
 
 export function monthlyQueryLimitForTier(tier: TierSlug | null | undefined): number {
-  if (tier === "standard") {
-    const pro = TIERS.find((t) => t.slug === "pro");
-    if (pro) return pro.monthlyQueryLimit;
-  }
-  const match = TIERS.find((t) => t.slug === tier);
+  // Legacy slugs: map to canonical equivalent before lookup.
+  const canonical =
+    tier === "standard" || tier === "starter" || tier === "pro" ? "advisor" :
+    tier === "unlimited" ? "principal" :
+    tier;
+  const match = TIERS.find((t) => t.slug === canonical);
   return (match ?? FREE_TIER).monthlyQueryLimit;
 }
 
 export function canUseSkills(tier: TierSlug | null | undefined): boolean {
-  return tier === "unlimited";
+  return tier === "principal" || tier === "unlimited";
 }
 
-// Workflows and coached sessions — Principal (unlimited) and above.
+// Workflows and coached sessions — Principal tier and above.
 export function canUseChat(tier: string | null | undefined): boolean {
-  return tier === "unlimited" || tier === "enterprise";
+  return tier === "principal" || tier === "unlimited" || tier === "enterprise";
 }
 
-// Engagement Hub / consult features — enterprise accounts only.
+// Engagement Hub / consult features — Principal tier and above.
 export function canUseConsult(tier: string | null | undefined): boolean {
-  return tier === "enterprise";
+  return tier === "principal" || tier === "unlimited" || tier === "enterprise";
 }
 
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
