@@ -1,5 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
-import { TIERS, type TierSlug } from "./tiers.js";
+import { TIERS, normalizeTierSlug, type TierSlug, type AnyTierSlug } from "./tiers.js";
 
 export type ContentTier = "free" | "paid";
 export type PlanSlug = "paid";
@@ -33,6 +33,7 @@ function tiersAtOrBelow(userTier: Tier): ContentTier[] {
 
 export type ClerkAuth = {
   userId: string | null;
+  orgId?: string | null;
   has: (params: { plan: string }) => boolean;
   sessionClaims?: Record<string, unknown> | null;
 };
@@ -58,7 +59,9 @@ function getEnv(name: string): string | undefined {
 // Caches keyed by `${topic}:${userId}` (topic-scoped) or `${userId}` / domain.
 const userMetaCache = new Map<string, { tier: "paid" | null; ts: number }>();
 const userEmailCache = new Map<string, { email: string | null; ts: number }>();
-const compDomainCache = new Map<string, { tier: "paid" | null; ts: number }>();
+const compDomainCache = new Map<string, { tier: AnyTierSlug | null; ts: number }>();
+const orgMetaCache = new Map<string, { rawTier: string | null; isActive: boolean; ts: number }>();
+const userOrgCache = new Map<string, { orgId: string | null; ts: number }>();
 const META_CACHE_MS = 5_000;
 
 function claimsMetadata(auth: ClerkAuth): Record<string, string | undefined> {
@@ -139,7 +142,7 @@ function domainFromEmail(email: string | null): string | null {
   return domain;
 }
 
-async function tierFromCompDomain(userId: string): Promise<"paid" | null> {
+async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
   const email = await emailForUser(userId);
   const domain = domainFromEmail(email);
   if (!domain) return null;
@@ -164,12 +167,36 @@ async function tierFromCompDomain(userId: string): Promise<"paid" | null> {
     if (!res.ok) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
     const rows = (await res.json()) as Array<{ tier?: string }>;
     const raw = rows[0]?.tier;
-    const tier: "paid" | null = (raw && raw !== "free") ? "paid" : null;
+    if (!raw || raw === "free") { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
+    const tier = normalizeTierSlug(raw);
     compDomainCache.set(domain, { tier, ts: Date.now() });
     return tier;
   } catch {
     compDomainCache.set(domain, { tier: null, ts: Date.now() });
     return null;
+  }
+}
+
+async function rawTierFromClerkOrg(orgId: string, cfg: TopicConfig): Promise<{ rawTier: string | null; isActive: boolean }> {
+  const cacheKey = `org:${cfg.topic}:${orgId}`;
+  const cached = orgMetaCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < META_CACHE_MS) return cached;
+
+  const secretKey = getEnv("CLERK_SECRET_KEY");
+  if (!secretKey) return { rawTier: null, isActive: false };
+
+  try {
+    const clerk = createClerkClient({ secretKey });
+    const org = await clerk.organizations.getOrganization({ organizationId: orgId });
+    const meta = (org.publicMetadata || {}) as Record<string, string | undefined>;
+    const rawTier = meta[`${cfg.topic}_subscription_tier`] ?? null;
+    const status = meta[`${cfg.topic}_subscription_status`] ?? null;
+    const isActive = !status || ACTIVE_STATUSES.has(status);
+    orgMetaCache.set(cacheKey, { rawTier, isActive, ts: Date.now() });
+    return { rawTier, isActive };
+  } catch {
+    orgMetaCache.set(cacheKey, { rawTier: null, isActive: false, ts: Date.now() });
+    return { rawTier: null, isActive: false };
   }
 }
 
@@ -203,8 +230,12 @@ export async function getUserTier(auth: ClerkAuth, cfg: TopicConfig): Promise<Ti
   if (fromClaims) return fromClaims;
   const fromApi = await tierFromClerkAPI(auth.userId, cfg);
   if (fromApi) return fromApi;
+  if (auth.orgId) {
+    const { rawTier, isActive } = await rawTierFromClerkOrg(auth.orgId, cfg);
+    if (rawTier && rawTier !== "free" && isActive) return "paid";
+  }
   const fromComp = await tierFromCompDomain(auth.userId);
-  if (fromComp) return fromComp;
+  if (fromComp) return "paid";
   if (hasPlan(auth)) return "paid";
   return "free";
 }
@@ -226,7 +257,7 @@ const KNOWN_TIER_SLUGS: ReadonlySet<TierSlug> = new Set<TierSlug>([
   "free", "advisor", "principal", "starter", "standard", "pro", "unlimited",
 ]);
 
-export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<TierSlug> {
+export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<AnyTierSlug> {
   if (!auth.userId) return "free";
 
   const meta = claimsMetadata(auth);
@@ -251,6 +282,19 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
       }
     } catch { /* fall through */ }
   }
+
+  // Check org-level subscription when the user has an active org session.
+  if (auth.orgId) {
+    const { rawTier, isActive } = await rawTierFromClerkOrg(auth.orgId, cfg);
+    if (rawTier && isActive) {
+      const normalized = normalizeTierSlug(rawTier);
+      if (normalized !== "free") return normalized;
+    }
+  }
+
+  // Check comp domain — preserves the actual slug (e.g. "team" for @foth.com).
+  const fromComp = await tierFromCompDomain(auth.userId);
+  if (fromComp) return fromComp;
 
   return await getUserTier(auth, cfg);
 }
@@ -299,4 +343,25 @@ export function unlocksProContentForTier(tier: TierSlug | null | undefined): boo
   return true;
 }
 
-export type { TierSlug } from "./tiers.js";
+// Returns the first Clerk org ID the user belongs to, or null. Used to scope
+// shared resources (e.g. proposals) for users without an active org session.
+export async function getPrimaryOrgId(userId: string): Promise<string | null> {
+  const cached = userOrgCache.get(userId);
+  if (cached && Date.now() - cached.ts < META_CACHE_MS) return cached.orgId;
+
+  const secretKey = getEnv("CLERK_SECRET_KEY");
+  if (!secretKey) return null;
+
+  try {
+    const clerk = createClerkClient({ secretKey });
+    const { data: memberships } = await clerk.users.getOrganizationMembershipList({ userId, limit: 1 });
+    const orgId = (memberships[0] as any)?.organization?.id ?? null;
+    userOrgCache.set(userId, { orgId, ts: Date.now() });
+    return orgId;
+  } catch {
+    userOrgCache.set(userId, { orgId: null, ts: Date.now() });
+    return null;
+  }
+}
+
+export type { TierSlug, AnyTierSlug } from "./tiers.js";
