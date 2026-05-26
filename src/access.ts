@@ -313,7 +313,8 @@ export const TIER_DISPLAY: Record<ContentTier, string> = {
 
 const FREE_TIER = TIERS.find((t) => t.slug === "free")!;
 
-export function monthlyQueryLimitForTier(tier: TierSlug | null | undefined): number {
+export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): number {
+  if (tier === "team") return 9999;  // team = unlimited, same as principal
   // Legacy slugs: map to canonical equivalent before lookup.
   const canonical =
     tier === "standard" || tier === "starter" || tier === "pro" ? "advisor" :

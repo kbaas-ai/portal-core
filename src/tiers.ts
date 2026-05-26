@@ -68,6 +68,7 @@ export function getTierDisplayName(slug: TierSlug | string): string {
   // Canonical slugs
   if (slug === "advisor") return "Advisor";
   if (slug === "principal") return "Principal";
+  if (slug === "team") return "Team";
   // Legacy slug display names
   if (slug === "starter" || slug === "standard" || slug === "pro") return "Advisor";
   if (slug === "unlimited") return "Principal";
