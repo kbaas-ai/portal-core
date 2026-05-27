@@ -82,6 +82,7 @@ export function normalizeTierSlug(slug: string): AnyTierSlug {
   if (slug === "principal") return "principal";
   if (slug === "starter" || slug === "standard" || slug === "pro") return "advisor";
   if (slug === "unlimited") return "principal";
+  if (slug === "paid") return "advisor"; // binary paid fallback — preserves minimum paid access
   if (slug === "team") return "team";
   if (slug === "enterprise") return "team"; // legacy alias
   const known = new Set<string>(["free", "advisor", "principal", "team"]);

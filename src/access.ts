@@ -296,7 +296,12 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
   const fromComp = await tierFromCompDomain(auth.userId);
   if (fromComp) return fromComp;
 
-  return await getUserTier(auth, cfg);
+  // Last resort: check Clerk plan claims for the specific tier slug.
+  // This preserves principal vs advisor distinction when metadata keys are absent.
+  if (auth.has({ plan: "principal" }) || auth.has({ plan: "unlimited" })) return "principal";
+  if (auth.has({ plan: "advisor" }) || auth.has({ plan: "pro" }) || auth.has({ plan: "standard" }) || auth.has({ plan: "starter" })) return "advisor";
+
+  return "free";
 }
 
 // Display labels for the binary ContentTier (free/paid).
