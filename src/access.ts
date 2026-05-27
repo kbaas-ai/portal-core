@@ -253,8 +253,8 @@ export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<"p
   return tier === "free" ? null : "paid";
 }
 
-const KNOWN_TIER_SLUGS: ReadonlySet<TierSlug> = new Set<TierSlug>([
-  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited",
+const KNOWN_TIER_SLUGS: ReadonlySet<AnyTierSlug> = new Set<AnyTierSlug>([
+  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited", "team",
 ]);
 
 export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<AnyTierSlug> {
