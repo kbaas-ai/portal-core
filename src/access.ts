@@ -330,17 +330,23 @@ export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): 
 }
 
 export function canUseSkills(tier: TierSlug | null | undefined): boolean {
-  return tier === "principal" || tier === "team";
+  if (!tier) return false;
+  const n = normalizeTierSlug(tier);
+  return n === "principal" || n === "team";
 }
 
 // Workflows and coached sessions — Principal tier and above.
 export function canUseChat(tier: string | null | undefined): boolean {
-  return tier === "principal" || tier === "team";
+  if (!tier) return false;
+  const n = normalizeTierSlug(tier);
+  return n === "principal" || n === "team";
 }
 
 // Engagement Hub / consult features — Principal tier and above.
 export function canUseConsult(tier: string | null | undefined): boolean {
-  return tier === "principal" || tier === "team";
+  if (!tier) return false;
+  const n = normalizeTierSlug(tier);
+  return n === "principal" || n === "team";
 }
 
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
