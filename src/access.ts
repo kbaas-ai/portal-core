@@ -156,7 +156,7 @@ async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
   if (!supabaseUrl || !serviceKey) return null;
 
   try {
-    const url = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/comp_domains?domain=eq.${encodeURIComponent(domain)}&select=tier&limit=1`;
+    const url = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/comp_domains?domain=eq.${encodeURIComponent(domain)}&select=tier,expires_at&limit=1`;
     const res = await fetch(url, {
       headers: {
         apikey: serviceKey,
@@ -165,8 +165,14 @@ async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
       },
     });
     if (!res.ok) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
-    const rows = (await res.json()) as Array<{ tier?: string }>;
-    const raw = rows[0]?.tier;
+    const rows = (await res.json()) as Array<{ tier?: string; expires_at?: string | null }>;
+    const row = rows[0];
+    const raw = row?.tier;
+    // Expired comp → no access.
+    if (row?.expires_at && new Date(row.expires_at) < new Date()) {
+      compDomainCache.set(domain, { tier: null, ts: Date.now() });
+      return null;
+    }
     if (!raw || raw === "free") { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
     const tier = normalizeTierSlug(raw);
     compDomainCache.set(domain, { tier, ts: Date.now() });
