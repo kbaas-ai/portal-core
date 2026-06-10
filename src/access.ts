@@ -60,6 +60,7 @@ function getEnv(name: string): string | undefined {
 const userMetaCache = new Map<string, { tier: "paid" | null; ts: number }>();
 const userEmailCache = new Map<string, { email: string | null; ts: number }>();
 const compDomainCache = new Map<string, { tier: AnyTierSlug | null; ts: number }>();
+const compUserCache = new Map<string, { tier: AnyTierSlug | null; ts: number }>();
 const orgMetaCache = new Map<string, { rawTier: string | null; isActive: boolean; ts: number }>();
 const userOrgCache = new Map<string, { orgId: string | null; ts: number }>();
 const META_CACHE_MS = 5_000;
@@ -142,6 +143,41 @@ function domainFromEmail(email: string | null): string | null {
   return domain;
 }
 
+async function tierFromCompUser(userId: string): Promise<AnyTierSlug | null> {
+  const email = await emailForUser(userId);
+  if (!email) return null;
+
+  const cached = compUserCache.get(email);
+  if (cached && Date.now() - cached.ts < META_CACHE_MS) return cached.tier;
+
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const serviceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return null;
+
+  try {
+    const url = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/comped_users?email=eq.${encodeURIComponent(email)}&select=tier,expires_at&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) { compUserCache.set(email, { tier: null, ts: Date.now() }); return null; }
+    const rows = (await res.json()) as Array<{ tier?: string; expires_at?: string | null }>;
+    const row = rows[0];
+    if (!row?.tier || row.tier === "free") { compUserCache.set(email, { tier: null, ts: Date.now() }); return null; }
+    const expired = row.expires_at && new Date(row.expires_at) < new Date();
+    if (expired) { compUserCache.set(email, { tier: null, ts: Date.now() }); return null; }
+    const tier = normalizeTierSlug(row.tier);
+    compUserCache.set(email, { tier, ts: Date.now() });
+    return tier;
+  } catch {
+    compUserCache.set(email, { tier: null, ts: Date.now() });
+    return null;
+  }
+}
+
 async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
   const email = await emailForUser(userId);
   const domain = domainFromEmail(email);
@@ -156,7 +192,7 @@ async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
   if (!supabaseUrl || !serviceKey) return null;
 
   try {
-    const url = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/comp_domains?domain=eq.${encodeURIComponent(domain)}&select=tier&limit=1`;
+    const url = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/comp_domains?domain=eq.${encodeURIComponent(domain)}&select=tier,expires_at&limit=1`;
     const res = await fetch(url, {
       headers: {
         apikey: serviceKey,
@@ -165,10 +201,12 @@ async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
       },
     });
     if (!res.ok) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
-    const rows = (await res.json()) as Array<{ tier?: string }>;
-    const raw = rows[0]?.tier;
-    if (!raw || raw === "free") { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
-    const tier = normalizeTierSlug(raw);
+    const rows = (await res.json()) as Array<{ tier?: string; expires_at?: string | null }>;
+    const row = rows[0];
+    if (!row?.tier || row.tier === "free") { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
+    const expired = row.expires_at && new Date(row.expires_at) < new Date();
+    if (expired) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
+    const tier = normalizeTierSlug(row.tier);
     compDomainCache.set(domain, { tier, ts: Date.now() });
     return tier;
   } catch {
@@ -234,6 +272,8 @@ export async function getUserTier(auth: ClerkAuth, cfg: TopicConfig): Promise<Ti
     const { rawTier, isActive } = await rawTierFromClerkOrg(auth.orgId, cfg);
     if (rawTier && rawTier !== "free" && isActive) return "paid";
   }
+  const fromCompUser = await tierFromCompUser(auth.userId);
+  if (fromCompUser) return "paid";
   const fromComp = await tierFromCompDomain(auth.userId);
   if (fromComp) return "paid";
   if (hasPlan(auth)) return "paid";
@@ -292,7 +332,9 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
     }
   }
 
-  // Check comp domain — preserves the actual slug (e.g. "team" for @foth.com).
+  // Check individual email comp first (overrides domain), then domain comp.
+  const fromCompUser = await tierFromCompUser(auth.userId);
+  if (fromCompUser) return fromCompUser;
   const fromComp = await tierFromCompDomain(auth.userId);
   if (fromComp) return fromComp;
 
