@@ -254,7 +254,7 @@ export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<"p
 }
 
 const KNOWN_TIER_SLUGS: ReadonlySet<AnyTierSlug> = new Set<AnyTierSlug>([
-  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited", "team",
+  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited", "team", "enterprise",
 ]);
 
 export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<AnyTierSlug> {
@@ -319,7 +319,7 @@ export const TIER_DISPLAY: Record<ContentTier, string> = {
 const FREE_TIER = TIERS.find((t) => t.slug === "free")!;
 
 export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): number {
-  if (tier === "team") return 9999;  // team = unlimited, same as principal
+  if (tier === "team" || tier === "enterprise") return 9999;  // team/enterprise = unlimited
   // Legacy slugs: map to canonical equivalent before lookup.
   const canonical =
     tier === "standard" || tier === "starter" || tier === "pro" ? "advisor" :
@@ -332,21 +332,21 @@ export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): 
 export function canUseSkills(tier: TierSlug | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
-  return n === "principal" || n === "team";
+  return n === "principal" || n === "team" || n === "enterprise";
 }
 
 // Workflows and coached sessions — Principal tier and above.
 export function canUseChat(tier: string | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
-  return n === "principal" || n === "team";
+  return n === "principal" || n === "team" || n === "enterprise";
 }
 
 // Engagement Hub / consult features — Principal tier and above.
 export function canUseConsult(tier: string | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
-  return n === "principal" || n === "team";
+  return n === "principal" || n === "team" || n === "enterprise";
 }
 
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
