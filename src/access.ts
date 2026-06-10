@@ -60,6 +60,7 @@ function getEnv(name: string): string | undefined {
 const userMetaCache = new Map<string, { tier: "paid" | null; ts: number }>();
 const userEmailCache = new Map<string, { email: string | null; ts: number }>();
 const compDomainCache = new Map<string, { tier: AnyTierSlug | null; ts: number }>();
+const compUserCache = new Map<string, { tier: AnyTierSlug | null; ts: number }>();
 const orgMetaCache = new Map<string, { rawTier: string | null; isActive: boolean; ts: number }>();
 const userOrgCache = new Map<string, { orgId: string | null; ts: number }>();
 const META_CACHE_MS = 5_000;
@@ -142,6 +143,41 @@ function domainFromEmail(email: string | null): string | null {
   return domain;
 }
 
+async function tierFromCompUser(userId: string): Promise<AnyTierSlug | null> {
+  const email = await emailForUser(userId);
+  if (!email) return null;
+
+  const cached = compUserCache.get(email);
+  if (cached && Date.now() - cached.ts < META_CACHE_MS) return cached.tier;
+
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const serviceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return null;
+
+  try {
+    const url = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/comped_users?email=eq.${encodeURIComponent(email)}&select=tier,expires_at&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) { compUserCache.set(email, { tier: null, ts: Date.now() }); return null; }
+    const rows = (await res.json()) as Array<{ tier?: string; expires_at?: string | null }>;
+    const row = rows[0];
+    if (!row?.tier || row.tier === "free") { compUserCache.set(email, { tier: null, ts: Date.now() }); return null; }
+    const expired = row.expires_at && new Date(row.expires_at) < new Date();
+    if (expired) { compUserCache.set(email, { tier: null, ts: Date.now() }); return null; }
+    const tier = normalizeTierSlug(row.tier);
+    compUserCache.set(email, { tier, ts: Date.now() });
+    return tier;
+  } catch {
+    compUserCache.set(email, { tier: null, ts: Date.now() });
+    return null;
+  }
+}
+
 async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
   const email = await emailForUser(userId);
   const domain = domainFromEmail(email);
@@ -167,14 +203,10 @@ async function tierFromCompDomain(userId: string): Promise<AnyTierSlug | null> {
     if (!res.ok) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
     const rows = (await res.json()) as Array<{ tier?: string; expires_at?: string | null }>;
     const row = rows[0];
-    const raw = row?.tier;
-    // Expired comp → no access.
-    if (row?.expires_at && new Date(row.expires_at) < new Date()) {
-      compDomainCache.set(domain, { tier: null, ts: Date.now() });
-      return null;
-    }
-    if (!raw || raw === "free") { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
-    const tier = normalizeTierSlug(raw);
+    if (!row?.tier || row.tier === "free") { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
+    const expired = row.expires_at && new Date(row.expires_at) < new Date();
+    if (expired) { compDomainCache.set(domain, { tier: null, ts: Date.now() }); return null; }
+    const tier = normalizeTierSlug(row.tier);
     compDomainCache.set(domain, { tier, ts: Date.now() });
     return tier;
   } catch {
@@ -240,6 +272,8 @@ export async function getUserTier(auth: ClerkAuth, cfg: TopicConfig): Promise<Ti
     const { rawTier, isActive } = await rawTierFromClerkOrg(auth.orgId, cfg);
     if (rawTier && rawTier !== "free" && isActive) return "paid";
   }
+  const fromCompUser = await tierFromCompUser(auth.userId);
+  if (fromCompUser) return "paid";
   const fromComp = await tierFromCompDomain(auth.userId);
   if (fromComp) return "paid";
   if (hasPlan(auth)) return "paid";
@@ -260,7 +294,7 @@ export async function getUserPlan(auth: ClerkAuth, cfg: TopicConfig): Promise<"p
 }
 
 const KNOWN_TIER_SLUGS: ReadonlySet<AnyTierSlug> = new Set<AnyTierSlug>([
-  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited", "team",
+  "free", "advisor", "principal", "starter", "standard", "pro", "unlimited", "team", "enterprise",
 ]);
 
 export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<AnyTierSlug> {
@@ -298,7 +332,9 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
     }
   }
 
-  // Check comp domain — preserves the actual slug (e.g. "team" for @foth.com).
+  // Check individual email comp first (overrides domain), then domain comp.
+  const fromCompUser = await tierFromCompUser(auth.userId);
+  if (fromCompUser) return fromCompUser;
   const fromComp = await tierFromCompDomain(auth.userId);
   if (fromComp) return fromComp;
 
@@ -325,7 +361,7 @@ export const TIER_DISPLAY: Record<ContentTier, string> = {
 const FREE_TIER = TIERS.find((t) => t.slug === "free")!;
 
 export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): number {
-  if (tier === "team") return 9999;  // team = unlimited, same as principal
+  if (tier === "team" || tier === "enterprise") return 9999;  // team/enterprise = unlimited
   // Legacy slugs: map to canonical equivalent before lookup.
   const canonical =
     tier === "standard" || tier === "starter" || tier === "pro" ? "advisor" :
@@ -338,21 +374,21 @@ export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): 
 export function canUseSkills(tier: TierSlug | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
-  return n === "principal" || n === "team";
+  return n === "principal" || n === "team" || n === "enterprise";
 }
 
 // Workflows and coached sessions — Principal tier and above.
 export function canUseChat(tier: string | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
-  return n === "principal" || n === "team";
+  return n === "principal" || n === "team" || n === "enterprise";
 }
 
 // Engagement Hub / consult features — Principal tier and above.
 export function canUseConsult(tier: string | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
-  return n === "principal" || n === "team";
+  return n === "principal" || n === "team" || n === "enterprise";
 }
 
 export function unlocksProContentForTier(tier: TierSlug | null | undefined): boolean {
