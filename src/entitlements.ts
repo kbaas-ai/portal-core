@@ -44,5 +44,33 @@ export function makeEntitlements(input: EntitlementsInput = {}): Entitlements {
   };
 }
 
+/** True if the user holds the given vault grant (id is normalized before compare). */
+export function hasVault(ent: Entitlements, vaultId: string): boolean {
+  return ent.vaults.includes(normalizeVault(vaultId));
+}
+
+/**
+ * The knowledge-retrieval allow-list: which vaults this user may query.
+ * Empty unless the user holds the base seat (knowledge is a base-gated add-on).
+ */
+export function vaultScope(ent: Entitlements): string[] {
+  return ent.base ? [...ent.vaults] : [];
+}
+
+/** Unlocks Ask/Search/Cowork + domain tools: base seat plus at least one vault. */
+export function canUseKnowledge(ent: Entitlements): boolean {
+  return ent.base && ent.vaults.length > 0;
+}
+
+/** API/webhooks ("Team"): base seat on annual billing. Annual is the sole gate. */
+export function canUseApi(ent: Entitlements): boolean {
+  return ent.base && ent.billing === "annual";
+}
+
+/** SSO: base seat plus the sso capability (the IT-asks-for-it add-on). */
+export function canUseSso(ent: Entitlements): boolean {
+  return ent.base && ent.caps.sso;
+}
+
 export type { AnyTierSlug };
 export { normalizeTierSlug };
