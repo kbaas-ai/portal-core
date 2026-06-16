@@ -91,5 +91,39 @@ export function deriveTierSlug(ent: Entitlements): AnyTierSlug {
   return "advisor";
 }
 
+/**
+ * Transitional bridge: builds Entitlements from today's resolved tier slug so new
+ * entitlement-aware code can run off existing Clerk/Supabase data before the
+ * dedicated entitlements store (chunk #2) exists. `defaultVault` is the topic vault
+ * a legacy paid subscriber is assumed to hold (logistics portal → "logistics").
+ */
+export function entitlementsFromTierSlug(
+  slug: AnyTierSlug,
+  opts: { defaultVault: string },
+): Entitlements {
+  switch (slug) {
+    case "free":
+      return makeEntitlements();
+    case "advisor":
+    case "principal":
+      return makeEntitlements({ base: true, vaults: [opts.defaultVault] });
+    case "team":
+      return makeEntitlements({ base: true, vaults: [opts.defaultVault], billing: "annual" });
+    case "enterprise":
+      return makeEntitlements({
+        base: true,
+        vaults: [opts.defaultVault],
+        billing: "annual",
+        caps: { sso: true },
+      });
+    default: {
+      // Legacy slugs (starter/standard/pro/unlimited): normalize, then re-map.
+      const canonical = normalizeTierSlug(slug);
+      if (canonical === slug) return makeEntitlements(); // guard against loops
+      return entitlementsFromTierSlug(canonical, opts);
+    }
+  }
+}
+
 export type { AnyTierSlug };
 export { normalizeTierSlug };
