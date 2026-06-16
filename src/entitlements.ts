@@ -72,5 +72,24 @@ export function canUseSso(ent: Entitlements): boolean {
   return ent.base && ent.caps.sso;
 }
 
+/**
+ * Lossy, transitional mapping from Entitlements → a legacy tier slug, so existing
+ * normalizeTierSlug-based page guards keep working while chunk #5 migrates them to
+ * the predicates above. The mapping is intentionally approximate:
+ *   - base-only (no vault) → "advisor": closest legacy paid slug. NOTE: advisor's
+ *     legacy semantics (content unlock) don't match base-only (no knowledge); base
+ *     users' engagement access is corrected when guards move to canUseKnowledge/
+ *     canUseApi in chunk #5. Do not add new product logic on top of this slug.
+ *   - advisor and principal both collapse here to the same "principal" once a vault
+ *     is held, matching the spec's "advisor/principal retired → base + vault".
+ */
+export function deriveTierSlug(ent: Entitlements): AnyTierSlug {
+  if (!ent.base) return "free";
+  if (canUseSso(ent)) return "enterprise";
+  if (canUseApi(ent)) return "team";
+  if (ent.vaults.length > 0) return "principal";
+  return "advisor";
+}
+
 export type { AnyTierSlug };
 export { normalizeTierSlug };
