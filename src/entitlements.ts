@@ -98,7 +98,7 @@ export function deriveTierSlug(ent: Entitlements): AnyTierSlug {
  * a legacy paid subscriber is assumed to hold (logistics portal → "logistics").
  */
 export function entitlementsFromTierSlug(
-  slug: AnyTierSlug,
+  slug: string,
   opts: { defaultVault: string },
 ): Entitlements {
   switch (slug) {
