@@ -371,7 +371,10 @@ export function monthlyQueryLimitForTier(tier: AnyTierSlug | null | undefined): 
   return (match ?? FREE_TIER).monthlyQueryLimit;
 }
 
-export function canUseSkills(tier: TierSlug | null | undefined): boolean {
+// Accepts AnyTierSlug (incl. team/enterprise) — callers like getUserAskTier
+// return AnyTierSlug, and the body already resolves those slugs via
+// normalizeTierSlug. Mirrors monthlyQueryLimitForTier's signature.
+export function canUseSkills(tier: AnyTierSlug | null | undefined): boolean {
   if (!tier) return false;
   const n = normalizeTierSlug(tier);
   return n === "principal" || n === "team" || n === "enterprise";
