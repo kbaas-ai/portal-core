@@ -129,6 +129,32 @@ export function getTierDisplayName(slug: TierSlug | string): string {
   return match?.displayName ?? "Free Trial";
 }
 
+// Canonical slugs that may be PERSISTED to an account's subscription metadata
+// (Clerk user/org). Excludes legacy/variant slugs (starter, pro, unlimited, …):
+// callers must persist the canonical form so reads stay unambiguous. Use this
+// to validate any hand-set or scripted tier write.
+export const WRITABLE_TIER_SLUGS = [
+  "free", "advisor", "principal", "team", "enterprise",
+] as const satisfies readonly AnyTierSlug[];
+
+export function isWritableTierSlug(slug: string): slug is AnyTierSlug {
+  return (WRITABLE_TIER_SLUGS as readonly string[]).includes(slug);
+}
+
+/**
+ * Validate a tier slug destined for persisted metadata. Returns the slug when
+ * canonical; throws on anything else (e.g. the "teams" typo) so writers fail
+ * loudly instead of silently storing a value that later normalizes to free.
+ */
+export function assertWritableTierSlug(slug: string): AnyTierSlug {
+  if (!isWritableTierSlug(slug)) {
+    throw new Error(
+      `Invalid tier slug "${slug}". Expected one of: ${WRITABLE_TIER_SLUGS.join(", ")}.`,
+    );
+  }
+  return slug;
+}
+
 // Maps legacy or variant slugs to the canonical active slug.
 export function normalizeTierSlug(slug: string): AnyTierSlug {
   if (slug === "advisor") return "advisor";
