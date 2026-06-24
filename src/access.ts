@@ -297,8 +297,38 @@ const KNOWN_TIER_SLUGS: ReadonlySet<AnyTierSlug> = new Set<AnyTierSlug>([
   "free", "advisor", "principal", "starter", "standard", "pro", "unlimited", "team", "enterprise",
 ]);
 
+// Access ordering for resolving the effective ask-tier when more than one
+// source applies. Higher = more access. Legacy/variant slugs are normalized
+// to a canonical slug first (e.g. unlimited → principal).
+const ASK_TIER_RANK: Record<string, number> = {
+  free: 0, advisor: 1, principal: 2, team: 3, enterprise: 4,
+};
+
+export function askTierRank(slug: string): number {
+  return ASK_TIER_RANK[normalizeTierSlug(slug)] ?? 0;
+}
+
+/**
+ * Resolve the effective ask-tier from a user-level and an org-level tier.
+ * The higher-ranked of the two wins, so an org entitlement RAISES the effective
+ * tier above a lower personal subscription (an enterprise-org member who also
+ * carries a personal Team plan resolves to enterprise), while a higher personal
+ * tier is never downgraded by a lower org tier. Ties keep the personal slug.
+ */
+export function effectiveAskTier(
+  userTier: string | null,
+  orgTier: string | null,
+): string | null {
+  if (!userTier) return orgTier;
+  if (!orgTier) return userTier;
+  return askTierRank(userTier) >= askTierRank(orgTier) ? userTier : orgTier;
+}
+
 export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise<AnyTierSlug> {
   if (!auth.userId) return "free";
+
+  // 1) User-level tier — session claims first, then the Clerk user record.
+  let userTier: AnyTierSlug | null = null;
 
   const meta = claimsMetadata(auth);
   const tierKey = `${cfg.topic}_subscription_tier`;
@@ -306,11 +336,11 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
   const claimTier = meta[tierKey] ?? (cfg.legacyTierKey ? meta[cfg.legacyTierKey] : undefined);
   const claimStatus = meta[statusKey] ?? (cfg.legacyStatusKey ? meta[cfg.legacyStatusKey] : undefined);
   if (claimTier && KNOWN_TIER_SLUGS.has(claimTier as TierSlug)) {
-    if (!claimStatus || ACTIVE_STATUSES.has(claimStatus)) return claimTier as TierSlug;
+    if (!claimStatus || ACTIVE_STATUSES.has(claimStatus)) userTier = claimTier as AnyTierSlug;
   }
 
   const secretKey = getEnv("CLERK_SECRET_KEY");
-  if (secretKey) {
+  if (!userTier && secretKey) {
     try {
       const clerk = createClerkClient({ secretKey });
       const user = await clerk.users.getUser(auth.userId);
@@ -318,21 +348,28 @@ export async function getUserAskTier(auth: ClerkAuth, cfg: TopicConfig): Promise
       const mTier = m[`${cfg.topic}_subscription_tier`] ?? (cfg.legacyTierKey ? m[cfg.legacyTierKey] : undefined);
       const mStatus = m[`${cfg.topic}_subscription_status`] ?? (cfg.legacyStatusKey ? m[cfg.legacyStatusKey] : undefined);
       if (mTier && KNOWN_TIER_SLUGS.has(mTier as TierSlug)) {
-        if (!mStatus || ACTIVE_STATUSES.has(mStatus)) return mTier as TierSlug;
+        if (!mStatus || ACTIVE_STATUSES.has(mStatus)) userTier = mTier as AnyTierSlug;
       }
     } catch { /* fall through */ }
   }
 
-  // Check org-level subscription when the user has an active org session.
+  // 2) Org-level subscription — when the user has an active org session, the
+  // org entitlement RAISES the effective tier above a lower personal plan (so
+  // an enterprise-org member with a personal Team plan resolves to enterprise).
+  // The higher-ranked of (user, org) wins; see effectiveAskTier.
   if (auth.orgId) {
     const { rawTier, isActive } = await rawTierFromClerkOrg(auth.orgId, cfg);
     if (rawTier && isActive) {
-      const normalized = normalizeTierSlug(rawTier);
-      if (normalized !== "free") return normalized;
+      const orgTier = normalizeTierSlug(rawTier);
+      if (orgTier !== "free") {
+        return effectiveAskTier(userTier, orgTier) as AnyTierSlug;
+      }
     }
   }
 
-  // Check individual email comp first (overrides domain), then domain comp.
+  if (userTier) return userTier;
+
+  // 3) Check individual email comp first (overrides domain), then domain comp.
   const fromCompUser = await tierFromCompUser(auth.userId);
   if (fromCompUser) return fromCompUser;
   const fromComp = await tierFromCompDomain(auth.userId);
