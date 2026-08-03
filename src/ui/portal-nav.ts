@@ -34,6 +34,17 @@ export interface PortalNavGroup {
   /** Translated heading to render. Defaults to label. */
   displayLabel?: string;
   items: PortalNavItem[];
+  /**
+   * Render as a <details> accordion rather than a flat labelled block. For
+   * long, browsable lists — a knowledge-base pillar tree, say — where a flat
+   * render would push the rest of the sidebar off-screen. The group opens
+   * automatically when it contains the active route.
+   */
+  collapsible?: boolean;
+  /** Start a collapsible group open even when nothing inside it is active. */
+  defaultOpen?: boolean;
+  /** Shown inside a collapsible group that has no items. */
+  emptyText?: string;
 }
 
 export interface PortalNav {
