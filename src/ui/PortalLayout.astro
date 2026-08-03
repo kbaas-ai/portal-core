@@ -29,8 +29,14 @@ export interface PortalBrand {
   titleSuffix: string;
   /** Sidebar logo, used when the org has no logo of its own. */
   logoSrc: string;
-  /** Small wordmark: mobile top bar and the "Powered by" footer. */
+  /** Small wordmark for the mobile top bar. */
   wordmarkSrc: string;
+  /**
+   * Mark shown in the "Powered by" footer. Defaults to wordmarkSrc, which is
+   * right for the flagship portal but wrong for a sub-brand — there it would
+   * read "Powered by <itself>".
+   */
+  poweredBySrc?: string;
   /** Short context label under the sidebar logo. */
   callout?: string | null;
 }
@@ -59,6 +65,10 @@ interface Props {
   isTenant?: boolean;
   legalLinks?: Array<{ label: string; href: string }>;
   poweredByHref?: string;
+  /** Accessible name for the "Powered by" mark. */
+  poweredByLabel?: string;
+  /** Top-bar help link. Pass null to omit it on portals with no help centre. */
+  helpHref?: string | null;
 }
 
 const {
@@ -74,6 +84,8 @@ const {
   isTenant = false,
   legalLinks = [],
   poweredByHref = 'https://www.knowledgebricks.com',
+  poweredByLabel = 'KnowledgeBricks',
+  helpHref = '/help',
 } = Astro.props;
 
 const labels = { signIn: 'Sign in', help: 'Help', ...labelsProp };
@@ -264,7 +276,7 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
         </div>
         <a href={poweredByHref} target="_blank" rel="noopener noreferrer" class="portal-powered-by">
           <span class="portal-powered-by-label">Powered by</span>
-          <img src={brand.wordmarkSrc} alt={brand.titleSuffix} class="portal-sidebar-logo-img" />
+          <img src={brand.poweredBySrc ?? brand.wordmarkSrc} alt={poweredByLabel} class="portal-sidebar-logo-img" />
         </a>
       </div>
 
@@ -307,13 +319,15 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
             <span class="portal-kb-badge-text">Enterprise KB</span>
           </span>
         )}
-        <a href="/help" class="portal-help-link" title={labels.help} aria-label={labels.help}>
+        {helpHref && (
+        <a href={helpHref} class="portal-help-link" title={labels.help} aria-label={labels.help}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"/>
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
         </a>
+        )}
         <slot name="topbar-extra" />
         {isSignedIn
           ? <UserButton />
