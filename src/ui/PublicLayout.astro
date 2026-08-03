@@ -1,0 +1,102 @@
+---
+/**
+ * core/src/ui/PublicLayout.astro — shared minimal shell for public-facing
+ * pages (sign-in, sign-up, contact, trial) that do not need the portal sidebar.
+ *
+ * Presentation only: branding and analytics ids come from the consuming portal.
+ */
+import Analytics from "@vercel/analytics/astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Appended to the page title: "<title> - <titleSuffix>". */
+  titleSuffix?: string;
+  lang?: string;
+  analytics?: { clarityId?: string | null; linkedInPartnerId?: string | null };
+}
+
+const {
+  title,
+  description = '',
+  titleSuffix = 'KnowledgeBricks',
+  lang = 'en',
+  analytics = {},
+} = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} — {titleSuffix}</title>
+  {description && <meta name="description" content={description} />}
+  <link rel="icon" href="/favicon.png" type="image/png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-sans@400,500,600,700&display=swap" />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=geist-mono@400,500&display=swap" />
+
+  <Analytics />
+
+  <!-- Microsoft Clarity - PROD only, and only when an id is configured. -->
+  {import.meta.env.PROD && analytics.clarityId && (
+    <script is:inline set:html={`(function(c,l,a,r,i,t,y){
+          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";
+          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", ${JSON.stringify(analytics.clarityId)});`} />
+  )}
+
+  <!-- LinkedIn Insight Tag -->
+  {import.meta.env.PROD && analytics.linkedInPartnerId && (
+    <script is:inline set:html={`_linkedin_partner_id = ${JSON.stringify(analytics.linkedInPartnerId)};
+window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+(function(l) {
+  if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+  window.lintrk.q=[]}
+  var s = document.getElementsByTagName("script")[0];
+  var b = document.createElement("script");
+  b.type = "text/javascript";b.async = true;
+  b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+  s.parentNode.insertBefore(b, s);})(window.lintrk);`} />
+  )}
+</head>
+<body class="pub-body">
+  <slot />
+</body>
+</html>
+
+<style is:global>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Design tokens */
+    --lp-indigo:       #3A56D2;
+    --lp-indigo-tint:  rgba(58, 86, 210, 0.08);
+    --lp-indigo-deep:  #263AA0;
+    --lp-charcoal:     #262A36;
+    --lp-steel:        #6C748A;
+    --lp-steel-lt:     #A8AEC0;
+    --lp-bg:           #F7F8FC;
+    --lp-bg2:          #ECEEF5;
+    --lp-border:       #E0E3EE;
+    --lp-border2:      #C8CCDB;
+    --lp-text:         #262A36;
+    --lp-white:        #FFFFFF;
+    --lp-font-mono:    'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .pub-body {
+    font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--lp-bg);
+    color: var(--lp-text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+</style>

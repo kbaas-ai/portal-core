@@ -1,0 +1,1016 @@
+---
+/**
+ * core/src/ui/PortalLayout.astro — the shared signed-in portal shell.
+ *
+ * Presentation only. It renders whatever nav model, branding, labels and org
+ * context the consuming portal hands it; it knows nothing about any specific
+ * portal's routes, tiers, price ladder or locales. Each portal wraps this with
+ * a thin layout of its own (see logistics-portal/src/layouts/PortalLayout.astro)
+ * that resolves those values and passes them down.
+ *
+ * Data fetching lives in the wrapper, not here — org/accent resolution is
+ * @core/ui/org-context.ts, so a portal that does not use Clerk orgs simply
+ * omits the `org` prop.
+ *
+ * Slots:
+ *   default        page content
+ *   topbar-extra   rendered in the top bar before the user button
+ *                  (logistics puts its language toggle here)
+ *   modals         rendered just above <main> (workspace-setup modal, etc.)
+ */
+import { UserButton } from '@clerk/astro/components';
+import Analytics from "@vercel/analytics/astro";
+import type { PortalNav, PortalNavItem } from './portal-nav.ts';
+import { isActiveHref, isItemActive, currentActFor } from './portal-nav.ts';
+import type { AccentPalette } from './accent-color.ts';
+
+export interface PortalBrand {
+  /** Appended to the page title: "<title> — <titleSuffix>". */
+  titleSuffix: string;
+  /** Sidebar logo, used when the org has no logo of its own. */
+  logoSrc: string;
+  /** Small wordmark: mobile top bar and the "Powered by" footer. */
+  wordmarkSrc: string;
+  /** Short context label under the sidebar logo. */
+  callout?: string | null;
+}
+
+export interface PortalOrgContext {
+  imageUrl?: string | null;
+  name?: string | null;
+  accentPalette?: AccentPalette | null;
+  isComped?: boolean;
+}
+
+interface Props {
+  title: string;
+  isSignedIn?: boolean;
+  /** Built by the portal — see @core/ui/portal-nav for the shape. */
+  nav: PortalNav;
+  bottomNav?: PortalNavItem[];
+  brand: PortalBrand;
+  org?: PortalOrgContext;
+  /** Rendered into <html lang>. */
+  lang?: string;
+  /** Chrome strings the portal may translate. */
+  labels?: { signIn?: string; help?: string };
+  analytics?: { clarityId?: string | null; linkedInPartnerId?: string | null };
+  /** Tenant builds send locked items to /start instead of /pricing. */
+  isTenant?: boolean;
+  legalLinks?: Array<{ label: string; href: string }>;
+  poweredByHref?: string;
+}
+
+const {
+  title,
+  isSignedIn = false,
+  nav,
+  bottomNav = [],
+  brand,
+  org = {},
+  lang = 'en',
+  labels: labelsProp = {},
+  analytics = {},
+  isTenant = false,
+  legalLinks = [],
+  poweredByHref = 'https://www.knowledgebricks.com',
+} = Astro.props;
+
+const labels = { signIn: 'Sign in', help: 'Help', ...labelsProp };
+
+const orgImageUrl = org.imageUrl ?? null;
+const resolvedOrgName = org.name ?? null;
+const accentPalette = org.accentPalette ?? null;
+const isComped = org.isComped === true;
+
+const path = Astro.url.pathname;
+
+// Route-matching and act resolution are shared rules — see @core/ui/portal-nav.
+const isActive = (href: string, exact = false) => isActiveHref(path, href, exact);
+const currentAct = currentActFor(path, nav);
+
+const defaultLockHref = isTenant ? '/start' : '/pricing?upgrade=principal';
+---
+
+<!DOCTYPE html>
+<html lang={lang} style={accentPalette ? `--lp-indigo:${accentPalette.accent};--lp-indigo-deep:${accentPalette.deep};--lp-indigo-tint:${accentPalette.tint};--portal-accent:${accentPalette.accent};--portal-accent-bg:${accentPalette.tint}` : undefined} data-accent-cached={accentPalette ? "1" : undefined}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} — {brand.titleSuffix}</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/favicon.png" type="image/png" />
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-sans@400,500,600,700&display=swap" />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=geist-mono@400,500&display=swap" />
+  <Analytics />
+  {import.meta.env.PROD && analytics.clarityId && (
+    <script is:inline set:html={`(function(c,l,a,r,i,t,y){
+          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i+"?ref=bwt";
+          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", ${JSON.stringify(analytics.clarityId)});`} />
+  )}
+  {import.meta.env.PROD && analytics.linkedInPartnerId && (
+    <script is:inline set:html={`_linkedin_partner_id = ${JSON.stringify(analytics.linkedInPartnerId)};
+window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+(function(l) {
+  if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+  window.lintrk.q=[]}
+  var s = document.getElementsByTagName("script")[0];
+  var b = document.createElement("script");
+  b.type = "text/javascript";b.async = true;
+  b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+  s.parentNode.insertBefore(b, s);})(window.lintrk);`} />
+  )}
+
+  {/* Client accent extraction from the org logo (runs once when not cached).
+      logoUrl is passed via <meta> so no values are interpolated into script text. */}
+  {isSignedIn && orgImageUrl && (
+    <>
+      <meta name="org-logo-url" content={orgImageUrl} />
+      <script is:inline src="/scripts/extract-accent.js"></script>
+    </>
+  )}
+</head>
+<body class="portal-body">
+
+<div class="portal-shell">
+
+  <!-- ── Sidebar ───────────────────────────────────────────── -->
+  <aside class="portal-sidebar" id="portal-sidebar" aria-label="Portal navigation">
+    <div class="portal-sidebar-inner">
+
+      <div class="portal-logo">
+        <a href="/start" class="portal-logo-link">
+          <div class="portal-logo-content">
+            {orgImageUrl ? (
+              <img
+                src={orgImageUrl}
+                alt={resolvedOrgName ?? 'Organization'}
+                class="portal-logo-org-img"
+              />
+            ) : (
+              <img src={brand.logoSrc} alt={brand.titleSuffix} class="portal-logo-img" />
+            )}
+            {isSignedIn && (
+              <div class="portal-logo-meta">
+                <span class="portal-logo-callout">{brand.callout}</span>
+              </div>
+            )}
+          </div>
+        </a>
+      </div>
+
+      <nav class="portal-nav">
+        <a
+          href={nav.dashboard.href}
+          class:list={['portal-nav-item', isActive(nav.dashboard.href, nav.dashboard.exact) && 'portal-nav-item--active']}
+          aria-current={isActive(nav.dashboard.href, nav.dashboard.exact) ? 'page' : undefined}
+        >
+          <span class="portal-nav-label">{nav.dashboard.displayLabel ?? nav.dashboard.label}</span>
+        </a>
+
+        {nav.groups.map((group) => (
+          <div class="portal-nav-group" data-act={group.label}>
+            <p class="portal-nav-group-label">{group.displayLabel ?? group.label}</p>
+            {group.items.map((item) => {
+              const active = isItemActive(path, item);
+              return (
+                <a
+                  href={item.locked ? (item.lockHref ?? defaultLockHref) : item.href}
+                  class:list={['portal-nav-item', active && 'portal-nav-item--active']}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <span class="portal-nav-label">{item.displayLabel ?? item.label}</span>
+                  {item.badge && <span class="portal-nav-badge">{item.badge}</span>}
+                  {item.locked && (
+                    <svg class="portal-nav-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Requires upgrade">
+                      <rect x="3" y="11" width="18" height="11" rx="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
+      <div class="portal-sidebar-bottom">
+        <div class="portal-bottom-nav">
+          {bottomNav.map((item) => (
+            <a
+              href={item.locked ? (item.lockHref ?? defaultLockHref) : item.href}
+              class:list={['portal-nav-item', isItemActive(path, item) && 'portal-nav-item--active']}
+            >
+              {item.displayLabel ?? item.label}
+              {item.locked && (
+                <svg class="portal-nav-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Requires Principal plan">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              )}
+            </a>
+          ))}
+        </div>
+        <div class="portal-legal-links">
+          {legalLinks.map((l) => (
+            <a href={l.href} class="portal-trust-link" set:html={l.label} />
+          ))}
+        </div>
+        <a href={poweredByHref} target="_blank" rel="noopener noreferrer" class="portal-powered-by">
+          <span class="portal-powered-by-label">Powered by</span>
+          <img src={brand.wordmarkSrc} alt={brand.titleSuffix} class="portal-sidebar-logo-img" />
+        </a>
+      </div>
+
+    </div>
+  </aside>
+
+  <div class="portal-backdrop" id="portal-backdrop" aria-hidden="true"></div>
+
+  <!-- ── Main column ──────────────────────────────────────── -->
+  <div class="portal-main">
+
+    <header class="portal-topbar">
+      <div class="portal-topbar-left">
+        <button
+          class="portal-hamburger"
+          id="portal-hamburger"
+          type="button"
+          aria-label="Open navigation"
+          aria-expanded="false"
+          aria-controls="portal-sidebar"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <span class="portal-topbar-wordmark">
+          <img src={brand.wordmarkSrc} alt={brand.titleSuffix} class="portal-topbar-logo-img" />
+        </span>
+        <h1 class="portal-topbar-title">{title}</h1>
+      </div>
+      <div class="portal-topbar-right">
+        {isSignedIn && isTenant && (
+          <span class="portal-kb-badge" title="Enterprise knowledge base — your organization's dedicated private workspace">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span class="portal-kb-badge-text">Enterprise KB</span>
+          </span>
+        )}
+        <a href="/help" class="portal-help-link" title={labels.help} aria-label={labels.help}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </a>
+        <slot name="topbar-extra" />
+        {isSignedIn
+          ? <UserButton />
+          : <a href="/sign-in" class="portal-signin-link">{labels.signIn}</a>
+        }
+      </div>
+    </header>
+
+    {isComped && (
+      <div id="comped-banner" class="comped-banner" role="status">
+        <span class="comped-banner-text">
+          Your organization has complimentary access to KnowledgeBricks.
+        </span>
+        <button
+          id="comped-banner-close"
+          class="comped-banner-close"
+          aria-label="Dismiss"
+          type="button"
+        >×</button>
+      </div>
+    )}
+    <slot name="modals" />
+    <main class="portal-content" data-act={currentAct ?? undefined}>
+      <slot />
+    </main>
+
+  </div>
+</div>
+
+<script>
+  const hamburger = document.getElementById('portal-hamburger');
+  const sidebar   = document.getElementById('portal-sidebar');
+  const backdrop  = document.getElementById('portal-backdrop');
+
+  function openSidebar() {
+    sidebar?.classList.add('portal-sidebar--open');
+    backdrop?.classList.add('portal-backdrop--visible');
+    hamburger?.setAttribute('aria-expanded', 'true');
+  }
+  function closeSidebar() {
+    sidebar?.classList.remove('portal-sidebar--open');
+    backdrop?.classList.remove('portal-backdrop--visible');
+    hamburger?.setAttribute('aria-expanded', 'false');
+  }
+
+  hamburger?.addEventListener('click', () => {
+    sidebar?.classList.contains('portal-sidebar--open') ? closeSidebar() : openSidebar();
+  });
+  backdrop?.addEventListener('click', closeSidebar);
+  document.querySelectorAll('.portal-nav-item').forEach((link) => {
+    link.addEventListener('click', () => { if (window.innerWidth < 768) closeSidebar(); });
+  });
+
+  // Comped banner session dismissal
+  (function () {
+    var banner = document.getElementById('comped-banner');
+    if (!banner) return;
+    if (sessionStorage.getItem('comped-dismissed')) {
+      banner.style.display = 'none';
+      return;
+    }
+    var closeBtn = document.getElementById('comped-banner-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        sessionStorage.setItem('comped-dismissed', '1');
+        if (banner) banner.style.display = 'none';
+      });
+    }
+  })();
+</script>
+
+</body>
+</html>
+
+<style is:global>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Design tokens ─────────────────────────────────────── */
+  :root {
+    /* Portal shell tokens */
+    --portal-bg:            #f9fafb;
+    --portal-surface:       #ffffff;
+    --portal-border:        #e5e7eb;
+    --portal-text:          #111827;
+    --portal-text-muted:    #6b7280;
+    --portal-text-faint:    #9ca3af;
+    /* Accent is aliased to the canonical brand blue (--lp-indigo) so the shell
+       and content surfaces share one accent. The per-org override on <html>
+       sets both --lp-indigo and --portal-accent together; these defaults match
+       it. Do not reintroduce a separate accent value here. */
+    --portal-accent:        var(--lp-indigo);
+    --portal-accent-bg:     var(--lp-indigo-tint);
+    --portal-hover-bg:      #f3f4f6;
+    --portal-font-mono:     'Geist Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --portal-sidebar-width: 240px;
+    --portal-topbar-height: 56px;
+
+    /* --lp-* bridge — used by ask.astro and cowork.astro */
+    --lp-indigo:       #3A56D2;
+    --lp-indigo-tint:  rgba(58, 86, 210, 0.08);
+    --lp-indigo-deep:  #263AA0;
+    --lp-charcoal:     #262A36;
+    --lp-steel:        #6C748A;
+    --lp-steel-lt:     #A8AEC0;
+    --lp-bg:           #F7F8FC;
+    --lp-bg2:          #ECEEF5;
+    --lp-border:       #E0E3EE;
+    --lp-border2:      #C8CCDB;
+    --lp-text:         #262A36;
+    --lp-white:        #FFFFFF;
+    --lp-font-mono:    'Geist Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  /* ── Per-act accent system (Explore · Deliver · Review) ──────
+     Derives three harmonious accents from the live org accent (--lp-indigo) by
+     hue rotation, so the dashboard grid, sidebar groups, and act sub-pages
+     share one colour language that still tracks the org logo theme. Any element
+     carrying data-act (or a descendant) can read var(--act) / var(--act-tint).
+     Falls back to the single accent where relative-colour syntax is absent. */
+  [data-act] { --act: var(--lp-indigo); --act-tint: var(--lp-indigo-tint); }
+  @supports (color: hsl(from white h s l)) {
+    [data-act="DELIVER"] { --act: hsl(from var(--lp-indigo) calc(h + 38) s l); }
+    [data-act="REVIEW"]  { --act: hsl(from var(--lp-indigo) calc(h - 48) s l); }
+  }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    [data-act] { --act-tint: color-mix(in srgb, var(--act) 7%, var(--lp-white)); }
+  }
+
+  /* ── Body ──────────────────────────────────────────────── */
+  .portal-body {
+    font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--portal-bg);
+    color: var(--portal-text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  /* ── Shell ─────────────────────────────────────────────── */
+  .portal-shell { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ───────────────────────────────────────────── */
+  .portal-sidebar {
+    width: var(--portal-sidebar-width);
+    flex-shrink: 0;
+    background: var(--portal-surface);
+    border-right: 1px solid var(--portal-border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 30;
+    scrollbar-width: thin;
+    scrollbar-color: var(--portal-border) transparent;
+  }
+  .portal-sidebar-inner {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+
+  /* Logo */
+  .portal-logo {
+    height: var(--portal-topbar-height);
+    display: flex;
+    align-items: center;
+    padding: 0 1.25rem;
+    border-bottom: 1px solid var(--portal-border);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .portal-logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    min-width: 0;
+  }
+  .portal-logo-content {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+  /* Default KB logo (no org) */
+  .portal-logo-img {
+    height: 30px;
+    width: auto;
+    flex-shrink: 0;
+    display: block;
+  }
+  /* Org logo (replaces KB logo when org has image) */
+  .portal-logo-org-img {
+    height: 30px;
+    width: auto;
+    max-width: 110px;
+    object-fit: contain;
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: block;
+  }
+  /* Text column beside the logo */
+  .portal-logo-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .portal-logo-callout {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lp-indigo);
+    line-height: 1.2;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Main nav */
+  .portal-nav {
+    padding: 0.75rem 0.625rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+  /* Three-act section groups */
+  .portal-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 0.5rem;
+  }
+  .portal-nav-group:first-of-type { margin-top: 0.25rem; }
+  .portal-nav-group-label {
+    font-family: var(--lp-font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--portal-text-faint);
+    padding: 0.4rem 0.625rem 0.2rem;
+    margin: 0;
+  }
+  .portal-nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--portal-text-muted);
+    text-decoration: none;
+    transition: background 0.1s, color 0.1s;
+    border-left: 2px solid transparent;
+  }
+  .portal-nav-item:hover {
+    background: var(--portal-hover-bg);
+    color: var(--portal-text);
+  }
+  .portal-nav-item--active {
+    background: var(--portal-accent-bg);
+    color: var(--portal-accent);
+    font-weight: 600;
+    border-left-color: var(--portal-accent);
+  }
+  /* Per-act tinting: the group label and the active item pick up their act's
+     accent so the sidebar echoes the dashboard grid. EXPLORE resolves to the
+     base accent, so it's unchanged. */
+  .portal-nav-group[data-act] .portal-nav-group-label { color: var(--act); }
+  .portal-nav-group[data-act] .portal-nav-item--active {
+    background: var(--act-tint);
+    color: var(--act);
+    border-left-color: var(--act);
+  }
+  .portal-nav-lock {
+    color: var(--portal-text-faint);
+    flex-shrink: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .portal-nav-item { transition: none; }
+  }
+
+  /* Knowledge Base accordion */
+  .portal-kb-group { border: none; }
+  .portal-kb-group > summary { list-style: none; }
+  .portal-kb-group > summary::-webkit-details-marker { display: none; }
+  .portal-kb-summary { cursor: pointer; user-select: none; }
+  .portal-kb-chevron {
+    color: var(--portal-text-faint);
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+  .portal-kb-group[open] .portal-kb-chevron { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .portal-kb-chevron { transition: none; } }
+  .portal-kb-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.25rem 0 0.25rem 0.75rem;
+    margin-left: 0.625rem;
+    border-left: 1px solid var(--portal-border);
+  }
+  .portal-kb-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.375rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--portal-text-muted);
+    text-decoration: none;
+    transition: background 0.1s, color 0.1s;
+  }
+  .portal-kb-item:hover { background: var(--portal-hover-bg); color: var(--portal-text); }
+  .portal-kb-item--active { color: var(--portal-accent); font-weight: 600; }
+  .portal-kb-empty {
+    font-size: 0.75rem;
+    color: var(--portal-text-faint);
+    font-style: italic;
+    padding: 0.375rem 0.625rem 0.25rem 1.375rem;
+    margin: 0;
+  }
+  @media (prefers-reduced-motion: reduce) { .portal-kb-item { transition: none; } }
+
+  /* Bottom nav + user block */
+  .portal-sidebar-bottom {
+    flex-shrink: 0;
+    border-top: 1px solid var(--portal-border);
+    padding: 0.625rem;
+  }
+  .portal-bottom-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 0.5rem;
+  }
+  .portal-user-block {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem 0.625rem 0.5rem;
+    margin-top: 0.375rem;
+    border-radius: 6px;
+    border-top: 1px solid var(--portal-border);
+  }
+  .portal-legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 0.5rem;
+    margin: 0.5rem 0 0;
+  }
+  .portal-trust-link {
+    display: inline-block;
+    text-align: center;
+    padding: 0.25rem 0;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--portal-text-faint);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+    transition: color 0.12s;
+  }
+  .portal-trust-link:hover {
+    color: var(--portal-text);
+  }
+  .portal-powered-by {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 0.5rem 0 0;
+    padding: 0.5rem 0.75rem 0.6rem;
+    border-radius: 7px;
+    background: #f1f3f6;
+    box-shadow:
+      inset 0 1px 3px rgba(0,0,0,0.10),
+      inset 0 0 0 1px rgba(0,0,0,0.06);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .portal-powered-by:hover {
+    background: #eaecf1;
+  }
+  .portal-powered-by-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--portal-text-faint);
+    line-height: 1;
+  }
+  .portal-sidebar-logo-img {
+    height: 18px;
+    width: auto;
+    display: block;
+    filter: grayscale(1) opacity(0.4);
+  }
+
+  /* Backdrop */
+  .portal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 20;
+  }
+  .portal-backdrop--visible { display: block; }
+
+  /* ── Main column ───────────────────────────────────────── */
+  .portal-main {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column;
+  }
+
+  /* Top bar */
+  .portal-topbar {
+    height: var(--portal-topbar-height);
+    background: var(--portal-surface);
+    border-bottom: 1px solid var(--portal-border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 1.5rem;
+    position: sticky; top: 0; z-index: 10;
+    flex-shrink: 0;
+  }
+  .portal-topbar-left {
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .portal-hamburger {
+    display: none;
+    background: transparent; border: none; cursor: pointer;
+    padding: 0.375rem; color: var(--portal-text-muted);
+    border-radius: 4px; line-height: 0;
+  }
+  .portal-hamburger:hover { background: var(--portal-hover-bg); color: var(--portal-text); }
+  .portal-hamburger:focus-visible { outline: 2px solid var(--portal-accent); outline-offset: 2px; }
+  .portal-topbar-wordmark {
+    display: none;
+    align-items: center;
+  }
+  .portal-topbar-logo-img {
+    height: 24px;
+    width: auto;
+    display: block;
+  }
+  .portal-topbar-title {
+    font-size: 0.9375rem; font-weight: 600;
+    color: var(--portal-text); letter-spacing: -0.01em;
+  }
+  .portal-topbar-right {
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  /* Tint the Clerk user avatar ring with the org accent. */
+  .portal-topbar-right .cl-avatarBox,
+  .portal-topbar-right .cl-userButtonAvatarBox {
+    box-shadow: 0 0 0 2px var(--lp-indigo);
+    border-radius: 50%;
+  }
+  .portal-topbar-right .cl-userButtonTrigger:focus {
+    box-shadow: 0 0 0 3px var(--lp-indigo-tint);
+  }
+  /* ── Private knowledge base badge (tenant deployments only) ── */
+  .portal-kb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--lp-font-mono);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+    color: #15803d;
+    background: rgba(22, 163, 74, 0.1);
+    border: 1px solid #16a34a;
+    border-radius: 999px;
+    padding: 0.28rem 0.55rem;
+  }
+  .portal-kb-badge svg { display: block; flex: none; }
+  @media (max-width: 640px) {
+    .portal-kb-badge-text { display: none; }
+    .portal-kb-badge { padding: 0.28rem; }
+  }
+  .portal-org-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid var(--portal-border);
+    flex-shrink: 0;
+  }
+  .portal-signin-link {
+    font-size: 0.875rem; font-weight: 500;
+    color: var(--portal-text-muted); text-decoration: none;
+  }
+  .portal-signin-link:hover { color: var(--portal-text); }
+
+  /* Help control in the top bar (replaces the old bottom-nav Help link). */
+  .portal-help-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    color: var(--portal-text-muted);
+    border: 1px solid var(--portal-border);
+    background: var(--portal-surface);
+    text-decoration: none;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .portal-help-link:hover {
+    color: var(--portal-accent);
+    border-color: var(--portal-accent);
+    background: var(--portal-accent-bg);
+  }
+  .portal-help-link:focus-visible {
+    outline: 2px solid var(--portal-accent); outline-offset: 2px;
+  }
+  .portal-help-link svg { display: block; }
+
+  /* ── Language flag dropdown (topbar island) ────────────── */
+  .lang-dd { position: relative; display: inline-flex; }
+  .lang-dd-trigger {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 7px; cursor: pointer;
+    background: var(--lp-white); color: var(--lp-steel);
+    border: 1px solid var(--lp-border); border-radius: 6px;
+    font-family: var(--lp-font-mono); font-size: 11px; line-height: 1.4;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .lang-dd-trigger:hover:not(:disabled) { border-color: var(--lp-indigo); color: var(--lp-text); }
+  .lang-dd-trigger:disabled { opacity: 0.6; cursor: default; }
+  .lang-dd-flag { font-size: 13px; line-height: 1; }
+  .lang-dd-code { font-weight: 500; letter-spacing: 0.04em; }
+  .lang-dd-caret { color: var(--lp-steel-lt); transition: transform 0.15s; }
+  .lang-dd-trigger[aria-expanded="true"] .lang-dd-caret { transform: rotate(180deg); }
+  .lang-dd-menu {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+    min-width: 168px; margin: 0; padding: 4px; list-style: none;
+    background: var(--lp-white);
+    border: 1px solid var(--lp-border); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(38, 42, 54, 0.12);
+  }
+  .lang-dd-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 7px 9px; cursor: pointer; text-align: left;
+    background: transparent; border: none; border-radius: 5px;
+    font-family: 'Instrument Sans', sans-serif; font-size: 13px;
+    color: var(--lp-text);
+  }
+  .lang-dd-item:hover { background: var(--lp-bg); }
+  .lang-dd-item--active { color: var(--lp-indigo); font-weight: 600; }
+  .lang-dd-name { flex: 1; }
+  .lang-dd-check { color: var(--lp-indigo); flex-shrink: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .lang-dd-trigger, .lang-dd-caret { transition: none; }
+  }
+
+  /* Content area */
+  .portal-content {
+    flex: 1;
+    padding: 2rem clamp(1rem, 3vw, 2.5rem);
+  }
+  /* Sub-page "← back" kicker picks up the page's act accent so the header
+     echoes the sidebar group it belongs to. Pages without a kicker are
+     unaffected. */
+  .portal-content[data-act] .tool-back { color: var(--act); }
+  .portal-content[data-act] .tool-back:hover { color: var(--act); opacity: 0.8; }
+
+  /* ── Mobile (< 768px) ──────────────────────────────────── */
+  @media (max-width: 767px) {
+    .portal-sidebar {
+      position: fixed; left: 0; top: 0;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+    }
+    .portal-sidebar--open { transform: translateX(0); }
+    .portal-hamburger { display: flex; }
+    .portal-topbar-wordmark { display: flex; }
+    .portal-topbar-title { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .portal-sidebar { transition: none; }
+  }
+
+  /* ── Comped access banner ──────────────────────────────── */
+  .comped-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.45rem 1.25rem;
+    background: var(--lp-indigo-tint);
+    border-bottom: 1px solid rgba(58, 86, 210, 0.2);
+    font-size: 0.8125rem;
+    color: var(--lp-steel);
+    width: 100%;
+  }
+
+  .comped-banner-text {
+    flex: 1;
+  }
+
+  .comped-banner-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--lp-steel-lt);
+    font-size: 1rem;
+    padding: 0 0.25rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .comped-banner-close:hover {
+    color: var(--lp-steel);
+  }
+
+  /* ── Nav coming soon badge ─────────────────────────────── */
+  .portal-nav-badge {
+    font-family: var(--lp-font-mono);
+    font-size: 0.525rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lp-indigo);
+    background: var(--lp-indigo-tint);
+    border: 1px solid var(--lp-indigo);
+    border-radius: 3px;
+    padding: 0.15em 0.45em;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0.75;
+  }
+
+  /* ── Workspace setup modal ─────────────────────────────── */
+  .ws-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .ws-modal-card {
+    position: relative;
+    background: var(--lp-white);
+    border: 1px solid var(--lp-border);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 28rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  }
+
+  .ws-modal-dismiss {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--lp-steel-lt);
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0.25rem;
+  }
+
+  .ws-modal-dismiss:hover {
+    color: var(--lp-steel);
+  }
+
+  .ws-modal-header {
+    margin-bottom: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .ws-modal-title {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--lp-text);
+    margin: 0 0 0.4rem;
+    line-height: 1.3;
+  }
+
+  .ws-modal-desc {
+    font-size: 0.875rem;
+    color: var(--lp-steel);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .ws-modal-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .ws-option-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.875rem 1rem;
+    background: var(--lp-white);
+    border: 1px solid var(--lp-border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+    width: 100%;
+  }
+
+  .ws-option-card:hover:not(:disabled) {
+    border-color: var(--lp-indigo);
+    background: var(--lp-indigo-tint);
+  }
+
+  .ws-option-card:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ws-option-label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--lp-text);
+  }
+
+  .ws-option-desc {
+    font-size: 0.8125rem;
+    color: var(--lp-steel);
+    line-height: 1.4;
+  }
+</style>
