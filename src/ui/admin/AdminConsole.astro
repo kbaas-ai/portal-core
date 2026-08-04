@@ -1,0 +1,128 @@
+---
+/**
+ * core/src/ui/admin/AdminConsole.astro — the platform-admin console body.
+ *
+ * Layout-agnostic on purpose: it renders the tab strip and panels only, so
+ * each portal wraps it in its own PortalLayout and owns the auth gate. The
+ * admin gate itself lives in @core/admin/gate.
+ */
+import CompManager from './CompManager';
+import TierInspector from './TierInspector';
+import AuditLog from './AuditLog';
+import TenantManager from './TenantManager';
+import UserDirectory from './UserDirectory';
+import AdminAnalytics from './AdminAnalytics';
+
+interface Props {
+  /** Which tab to open; falls back to "comps". */
+  activeTab?: string;
+}
+
+const KNOWN_TABS = ['comps', 'inspector', 'audit', 'tenants', 'users', 'analytics'];
+const { activeTab: tabProp = 'comps' } = Astro.props;
+const activeTab = KNOWN_TABS.includes(tabProp) ? tabProp : 'comps';
+---
+
+  <div class="integrations-shell">
+    <div class="integrations-header">
+      <h1 class="integrations-title">Admin</h1>
+      <p class="integrations-desc">Manage complimentary access and trials, and inspect how a user's tier resolves.</p>
+    </div>
+
+    <div class="integrations-tabs" role="tablist">
+      <button class="integrations-tab" class:list={[activeTab === 'comps' && 'integrations-tab--active']} data-tab="comps" type="button">Comps &amp; Trials</button>
+      <button class="integrations-tab" class:list={[activeTab === 'users' && 'integrations-tab--active']} data-tab="users" type="button">Users</button>
+      <button class="integrations-tab" class:list={[activeTab === 'inspector' && 'integrations-tab--active']} data-tab="inspector" type="button">Tier Inspector</button>
+      <button class="integrations-tab" class:list={[activeTab === 'tenants' && 'integrations-tab--active']} data-tab="tenants" type="button">Tenants</button>
+      <button class="integrations-tab" class:list={[activeTab === 'analytics' && 'integrations-tab--active']} data-tab="analytics" type="button">Analytics</button>
+      <button class="integrations-tab" class:list={[activeTab === 'audit' && 'integrations-tab--active']} data-tab="audit" type="button">Audit Log</button>
+    </div>
+
+    <div id="panel-comps" class="integrations-panel" class:list={[activeTab !== 'comps' && 'integrations-panel--hidden']} role="tabpanel">
+      <CompManager client:load />
+    </div>
+    <div id="panel-users" class="integrations-panel" class:list={[activeTab !== 'users' && 'integrations-panel--hidden']} role="tabpanel">
+      <UserDirectory client:load />
+    </div>
+    <div id="panel-inspector" class="integrations-panel" class:list={[activeTab !== 'inspector' && 'integrations-panel--hidden']} role="tabpanel">
+      <TierInspector client:load />
+    </div>
+    <div id="panel-tenants" class="integrations-panel" class:list={[activeTab !== 'tenants' && 'integrations-panel--hidden']} role="tabpanel">
+      <TenantManager client:load />
+    </div>
+    <div id="panel-analytics" class="integrations-panel" class:list={[activeTab !== 'analytics' && 'integrations-panel--hidden']} role="tabpanel">
+      <AdminAnalytics client:load />
+    </div>
+    <div id="panel-audit" class="integrations-panel" class:list={[activeTab !== 'audit' && 'integrations-panel--hidden']} role="tabpanel">
+      <AuditLog client:load />
+    </div>
+  </div>
+<script>
+  const tabs = document.querySelectorAll<HTMLButtonElement>('.integrations-tab');
+  const panels = document.querySelectorAll<HTMLElement>('.integrations-panel');
+  function activateTab(tabId: string) {
+    tabs.forEach((t) => {
+      const isActive = t.dataset.tab === tabId;
+      t.classList.toggle('integrations-tab--active', isActive);
+    });
+    panels.forEach((p) => p.classList.toggle('integrations-panel--hidden', p.id !== `panel-${tabId}`));
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabId);
+    history.replaceState(null, '', url.toString());
+  }
+  tabs.forEach((tab) => tab.addEventListener('click', () => activateTab(tab.dataset.tab!)));
+</script>
+
+<style>
+  .integrations-shell {
+    max-width: 860px;
+  }
+
+  .integrations-header {
+    margin-bottom: 1.5rem;
+  }
+  .integrations-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--lp-text);
+    margin-bottom: 0.375rem;
+    letter-spacing: -0.02em;
+  }
+  .integrations-desc {
+    font-size: 0.875rem;
+    color: var(--lp-steel);
+    line-height: 1.55;
+  }
+
+  .integrations-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--lp-border);
+    margin-bottom: 1.75rem;
+  }
+  .integrations-tab {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem 1.125rem 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--lp-steel);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.12s, border-color 0.12s;
+    font-family: inherit;
+  }
+  .integrations-tab:hover {
+    color: var(--lp-text);
+  }
+  .integrations-tab--active {
+    color: var(--lp-indigo);
+    border-bottom-color: var(--lp-indigo);
+    font-weight: 600;
+  }
+
+  .integrations-panel--hidden {
+    display: none;
+  }
+</style>
