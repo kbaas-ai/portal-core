@@ -1,0 +1,274 @@
+---
+/**
+ * core/src/ui/help/HelpIndex.astro — help-centre landing page body.
+ *
+ * Layout-agnostic: renders the search box and section grid only, so each
+ * portal wraps it in its own PortalLayout and owns the auth gate. Articles are
+ * passed in, because the CONTENT is per-portal — each portal documents its own
+ * features against the same section vocabulary (@core/help/sections).
+ */
+import HelpSearch from './HelpSearch';
+import { HELP_SECTIONS, sectionLabel } from '../../help/sections.ts';
+
+export interface HelpArticleEntry {
+  slug: string;
+  data: { title: string; description: string; section: string; order: number; tags: string[] };
+}
+
+interface Props {
+  articles: HelpArticleEntry[];
+  /** Articles shown per section on the landing page. */
+  perSection?: number;
+}
+
+const { articles, perSection = 4 } = Astro.props;
+
+const articleIndex = articles.map((a) => ({
+  title: a.data.title,
+  description: a.data.description,
+  tags: a.data.tags,
+  slug: a.slug,
+  section: a.data.section,
+}));
+
+const SECTIONS = HELP_SECTIONS.map((key) => ({ key, label: sectionLabel(key) }));
+
+function topArticles(sectionKey: string, n = perSection) {
+  return articles
+    .filter((a) => a.data.section === sectionKey)
+    .sort((a, b) => a.data.order - b.data.order)
+    .slice(0, n);
+}
+---
+
+  <div class="help-hub">
+    <div class="help-hub-header">
+      <h1 class="help-hub-title">Help Center</h1>
+      <p class="help-hub-desc">Guides, references, and answers for the KnowledgeBricks platform.</p>
+    </div>
+
+    <HelpSearch client:load articles={articleIndex} />
+
+    <div class="help-sections">
+      {SECTIONS.map(({ key, label }) => {
+        const articles = topArticles(key);
+        if (articles.length === 0) return null;
+        return (
+          <div class="help-section-card">
+            <h2 class="help-section-label">{label}</h2>
+            <ul class="help-article-list">
+              {articles.map((a) => (
+                <li>
+                  <a href={`/help/${a.slug}`} class="help-article-link">
+                    <span class="help-article-title">{a.data.title}</span>
+                    <span class="help-article-desc">{a.data.description}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+
+    <p class="help-footer">
+      Still need help? Email <a href="mailto:support@knowledgebricks.com">support@knowledgebricks.com</a>.
+    </p>
+  </div>
+<style>
+  .help-hub {
+    max-width: 52rem;
+  }
+
+  .help-hub-header {
+    margin-bottom: 1.75rem;
+  }
+
+  .help-hub-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--lp-text);
+    margin: 0 0 0.35rem;
+  }
+
+  .help-hub-desc {
+    color: var(--lp-steel);
+    font-size: 0.9375rem;
+    margin: 0;
+  }
+
+  /* ── Search ─────────────────────────────────────────────────────── */
+  .help-hub :global(.help-search) {
+    margin-bottom: 2rem;
+  }
+
+  .help-hub :global(.help-search-bar) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--lp-border);
+    border-radius: 8px;
+    background: var(--lp-white);
+    padding: 0 0.75rem;
+    transition: border-color 0.15s;
+  }
+
+  .help-hub :global(.help-search-bar:focus-within) {
+    border-color: var(--lp-indigo);
+  }
+
+  .help-hub :global(.help-search-icon) {
+    color: var(--lp-steel);
+    flex-shrink: 0;
+  }
+
+  .help-hub :global(.help-search-input) {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 0.9375rem;
+    color: var(--lp-text);
+    padding: 0.75rem 0;
+    outline: none;
+  }
+
+  .help-hub :global(.help-search-input::placeholder) {
+    color: var(--lp-steel-lt);
+  }
+
+  .help-hub :global(.help-search-clear) {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--lp-steel);
+    font-size: 1.1rem;
+    padding: 0 0.25rem;
+    line-height: 1;
+  }
+
+  .help-hub :global(.help-search-results) {
+    margin-top: 0.5rem;
+    border: 1px solid var(--lp-border);
+    border-radius: 8px;
+    background: var(--lp-white);
+    overflow: hidden;
+  }
+
+  .help-hub :global(.help-search-empty) {
+    padding: 1rem;
+    color: var(--lp-steel);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  .help-hub :global(.help-search-list) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .help-hub :global(.help-search-item + .help-search-item) {
+    border-top: 1px solid var(--lp-border);
+  }
+
+  .help-hub :global(.help-search-link) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    transition: background 0.1s;
+  }
+
+  .help-hub :global(.help-search-link:hover) {
+    background: var(--lp-bg2, #f9f9f9);
+  }
+
+  .help-hub :global(.help-search-title) {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--lp-text);
+  }
+
+  .help-hub :global(.help-search-desc) {
+    font-size: 0.85rem;
+    color: var(--lp-steel);
+  }
+
+  /* ── Section grid ────────────────────────────────────────────────── */
+  .help-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+    gap: 1.25rem;
+  }
+
+  .help-section-card {
+    border: 1px solid var(--lp-border);
+    border-radius: 8px;
+    background: var(--lp-white);
+    padding: 1.25rem;
+  }
+
+  .help-section-label {
+    font-family: var(--lp-font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--lp-steel);
+    margin: 0 0 0.875rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--lp-border);
+  }
+
+  .help-article-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .help-article-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: 5px;
+    text-decoration: none;
+    transition: background 0.1s;
+  }
+
+  .help-article-link:hover {
+    background: var(--lp-bg2, #f5f5f5);
+  }
+
+  .help-article-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--lp-text);
+  }
+
+  .help-article-desc {
+    font-size: 0.8rem;
+    color: var(--lp-steel);
+    line-height: 1.4;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────────────── */
+  .help-footer {
+    margin-top: 2rem;
+    color: var(--lp-steel);
+    font-size: 0.875rem;
+  }
+
+  .help-footer a {
+    color: var(--lp-indigo);
+    text-decoration: none;
+  }
+
+  .help-footer a:hover {
+    text-decoration: underline;
+  }
+</style>

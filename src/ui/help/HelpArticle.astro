@@ -1,0 +1,207 @@
+---
+/**
+ * core/src/ui/help/HelpArticle.astro — a single help article body.
+ *
+ * Layout-agnostic; the portal resolves the entry, renders its own layout and
+ * owns the auth gate.
+ */
+import { sectionLabel } from '../../help/sections.ts';
+
+interface Props {
+  entry: { data: { title: string; description: string; section: string } };
+  /** Rendered content component from `await entry.render()`. */
+  Content: any;
+}
+
+const { entry, Content } = Astro.props;
+const sectionLabelText = sectionLabel(entry.data.section);
+---
+
+  <div class="help-article">
+    <nav class="help-breadcrumb" aria-label="Breadcrumb">
+      <a href="/help">Help</a>
+      <span class="help-bc-sep">›</span>
+      <span>{sectionLabelText}</span>
+      <span class="help-bc-sep">›</span>
+      <span>{entry.data.title}</span>
+    </nav>
+
+    <header class="help-article-header">
+      <h1 class="help-article-title">{entry.data.title}</h1>
+      <p class="help-article-desc">{entry.data.description}</p>
+    </header>
+
+    <div class="help-article-body prose">
+      <Content />
+    </div>
+
+    <footer class="help-article-footer">
+      <p>Still need help? <a href="/contact">Contact support</a>.</p>
+    </footer>
+  </div>
+<style>
+  .help-article {
+    max-width: 46rem;
+  }
+
+  .help-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--lp-steel);
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .help-breadcrumb a {
+    color: var(--lp-indigo);
+    text-decoration: none;
+  }
+
+  .help-breadcrumb a:hover {
+    text-decoration: underline;
+  }
+
+  .help-bc-sep {
+    color: var(--lp-steel-lt);
+  }
+
+  .help-article-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--lp-border);
+  }
+
+  .help-article-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--lp-text);
+    margin: 0 0 0.5rem;
+  }
+
+  .help-article-desc {
+    color: var(--lp-steel);
+    font-size: 0.9375rem;
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  /* ── Prose styles for MDX body ─────────────────────────────────── */
+  .help-article-body.prose :global(h2) {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--lp-text);
+    margin: 2rem 0 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--lp-border);
+  }
+
+  .help-article-body.prose :global(h3) {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--lp-text);
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  .help-article-body.prose :global(p) {
+    color: var(--lp-steel);
+    font-size: 0.9rem;
+    line-height: 1.65;
+    margin: 0 0 0.875rem;
+  }
+
+  .help-article-body.prose :global(ul),
+  .help-article-body.prose :global(ol) {
+    color: var(--lp-steel);
+    font-size: 0.9rem;
+    line-height: 1.65;
+    margin: 0 0 0.875rem;
+    padding-left: 1.25rem;
+  }
+
+  .help-article-body.prose :global(li) {
+    margin-bottom: 0.3rem;
+  }
+
+  .help-article-body.prose :global(a) {
+    color: var(--lp-indigo);
+    text-decoration: none;
+  }
+
+  .help-article-body.prose :global(a:hover) {
+    text-decoration: underline;
+  }
+
+  .help-article-body.prose :global(code) {
+    font-size: 0.85em;
+    background: var(--lp-bg2, #f5f5f5);
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+    font-family: var(--lp-font-mono);
+  }
+
+  .help-article-body.prose :global(pre) {
+    background: var(--lp-bg2, #f5f5f5);
+    border: 1px solid var(--lp-border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 0 0 1rem;
+  }
+
+  .help-article-body.prose :global(pre code) {
+    background: none;
+    padding: 0;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .help-article-body.prose :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    margin: 0 0 1rem;
+  }
+
+  .help-article-body.prose :global(th) {
+    text-align: left;
+    font-weight: 600;
+    color: var(--lp-text);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--lp-border);
+  }
+
+  .help-article-body.prose :global(td) {
+    color: var(--lp-steel);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--lp-border);
+    vertical-align: top;
+  }
+
+  .help-article-body.prose :global(blockquote) {
+    border-left: 3px solid var(--lp-indigo);
+    padding: 0.5rem 0 0.5rem 1rem;
+    margin: 0 0 1rem;
+    color: var(--lp-steel);
+    font-size: 0.9rem;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────────────── */
+  .help-article-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--lp-border);
+    color: var(--lp-steel);
+    font-size: 0.875rem;
+  }
+
+  .help-article-footer a {
+    color: var(--lp-indigo);
+    text-decoration: none;
+  }
+
+  .help-article-footer a:hover {
+    text-decoration: underline;
+  }
+</style>

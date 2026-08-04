@@ -184,3 +184,46 @@ export function invitationRevokeHandler(_deps: TeamDeps) {
     return json({ ok: true });
   };
 }
+
+// ── PATCH /api/account/accent-color ────────────────────────────────────────
+//
+// Caches the org accent extracted client-side from its logo (see
+// public/scripts/extract-accent.js) onto Clerk org publicMetadata.accent_color.
+// resolveOrgContext reads it back on the next render, so the palette is applied
+// server-side with no flash of the default brand colour.
+//
+// Org-only by design: there is no per-user fallback, because the accent themes
+// a shared workspace rather than an individual's session.
+export function accentColorHandler(_deps: TeamDeps) {
+  return async ({ locals, request }: TeamCtx) => {
+    const auth = locals.auth?.();
+    const userId = auth?.userId ?? null;
+    const orgId = auth?.orgId ?? null;
+    if (!userId || !orgId) return json({ error: "Org session required" }, 400);
+
+    const body = await request.json().catch(() => ({} as any));
+    const value = body?.accent_color;
+
+    // Accept null (reset) or a 6-digit hex.
+    if (value !== null && !/^#[0-9a-fA-F]{6}$/.test(value ?? "")) {
+      return json({ error: "accent_color must be #RRGGBB or null" }, 400);
+    }
+
+    const secretKey =
+      (import.meta as any).env?.CLERK_SECRET_KEY ?? process.env.CLERK_SECRET_KEY;
+    if (!secretKey) return json({ error: "server misconfigured" }, 500);
+
+    try {
+      const { createClerkClient } = await import("@clerk/backend");
+      const clerk = createClerkClient({ secretKey });
+      const org = await clerk.organizations.getOrganization({ organizationId: orgId });
+      await clerk.organizations.updateOrganization(orgId, {
+        publicMetadata: { ...(org.publicMetadata as object), accent_color: value },
+      });
+    } catch (e: any) {
+      return json({ error: e?.message ?? "update failed" }, 500);
+    }
+
+    return json({ ok: true, accent_color: value });
+  };
+}
