@@ -56,7 +56,7 @@ function flat(monthlyCents: number, annualCents?: number): {
 
 // Active plans for sale. Legacy slugs (starter, standard, pro, unlimited) are
 // kept in TierSlug for Stripe back-compat but are not shown in the UI.
-// New subscribers should only be on free, advisor, principal, team, or enterprise.
+// New subscribers should only be on principal or team.
 export const TIERS: readonly TierConfig[] = [
   {
     slug: "free", displayName: "Free Trial", status: "hidden",
@@ -67,26 +67,27 @@ export const TIERS: readonly TierConfig[] = [
     slug: "advisor", displayName: "Advisor", status: "retired",
     ...flat(4900, 49000), monthlyQueryLimit: 50, unlocksProContent: true,
     stripeProductDescription:
-      "KnowledgeBricks Advisor — 50 queries/month and the full practitioner content library.",
+      "Advisor — 50 queries/month and the full practitioner content library.",
   },
   {
     slug: "principal", displayName: "Principal", status: "active",
-    ...flat(12900, 118800), monthlyQueryLimit: 9999, unlocksProContent: true,
+    ...flat(9900), monthlyQueryLimit: 9999, unlocksProContent: true,
     stripeProductDescription:
-      "KnowledgeBricks Principal — unlimited queries, full content library, and every practitioner skill.",
+      "Principal — unlimited queries, full content library, and every practitioner skill.",
   },
   {
     slug: "team", displayName: "Team", status: "active",
-    pricing: { kind: "seat", seatCents: 94800, minSeats: 5, interval: "year" },
+    pricing: { kind: "seat", seatCents: 70800, minSeats: 5, interval: "year" }, // $59/user/mo × 12
     monthlyQueryLimit: 9999, unlocksProContent: true,
     stripeProductDescription:
-      "KnowledgeBricks Team — everything in Principal plus collaboration, API, and Lessons Learned, billed annually per seat.",
+      "Team — everything in Principal plus collaboration, API, Lessons Learned, onboarding pathways, and private-vault distillation. Billed annually per seat.",
   },
   {
-    slug: "enterprise", displayName: "Enterprise", status: "active",
+    // Retired 2026-09-03: folded into Team. Slug kept for existing
+    // enterprise-comped orgs; every gate treats it as Team.
+    slug: "enterprise", displayName: "Team", status: "retired",
     pricing: { kind: "custom" }, monthlyQueryLimit: 9999, unlocksProContent: true,
-    stripeProductDescription:
-      "KnowledgeBricks Enterprise — private vault, onboarding, experts, and SSO. Custom pricing.",
+    skipStripe: true,
   },
 ] as const;
 
@@ -121,7 +122,7 @@ export function getTierDisplayName(slug: TierSlug | string): string {
   if (slug === "advisor") return "Advisor";
   if (slug === "principal") return "Principal";
   if (slug === "team") return "Team";
-  if (slug === "enterprise") return "Enterprise";
+  if (slug === "enterprise") return "Team"; // folded into Team 2026-09-03
   // Legacy slug display names
   if (slug === "starter" || slug === "standard" || slug === "pro") return "Advisor";
   if (slug === "unlimited") return "Principal";
