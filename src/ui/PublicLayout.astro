@@ -15,6 +15,13 @@ interface Props {
   socialImage?: string;
   /** Set true to keep a public-shell page out of the index. Rare. */
   noindex?: boolean;
+  /**
+   * Overrides the derived canonical. Pass when this page duplicates another
+   * URL's content and that other URL is the one that should rank.
+   */
+  canonical?: string;
+  /** schema.org data for this page — see SeoHead. */
+  jsonLd?: object | object[];
   /** Appended to the page title: "<title> - <titleSuffix>". */
   titleSuffix?: string;
   lang?: string;
@@ -26,6 +33,8 @@ const {
   description = '',
   socialImage,
   noindex = false,
+  canonical,
+  jsonLd,
   titleSuffix = 'KnowledgeBricks',
   lang = 'en',
   analytics = {},
@@ -42,6 +51,8 @@ const {
     title={`${title} — ${titleSuffix}`}
     description={description}
     image={socialImage}
+    canonical={canonical}
+    jsonLd={jsonLd}
     noindex={noindex}
     siteName={titleSuffix}
   />

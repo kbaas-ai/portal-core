@@ -61,6 +61,13 @@ interface Props {
   indexable?: boolean;
   /** Social card image for this page, root-relative or absolute. */
   socialImage?: string;
+  /**
+   * Overrides the derived canonical. Pass when this page duplicates another
+   * URL's content and that other URL is the one that should rank.
+   */
+  canonical?: string;
+  /** schema.org data for this page — see SeoHead. */
+  jsonLd?: object | object[];
   isSignedIn?: boolean;
   /** Built by the portal — see @core/ui/portal-nav for the shape. */
   nav: PortalNav;
@@ -87,6 +94,8 @@ const {
   description = '',
   indexable = false,
   socialImage,
+  canonical,
+  jsonLd,
   isSignedIn = false,
   nav,
   bottomNav = [],
@@ -128,6 +137,8 @@ const defaultLockHref = isTenant ? '/start' : '/pricing?upgrade=principal';
     title={`${title} — ${brand.titleSuffix}`}
     description={description}
     image={socialImage}
+    canonical={canonical}
+    jsonLd={jsonLd}
     noindex={!indexable}
     siteName={brand.titleSuffix}
   />

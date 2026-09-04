@@ -24,6 +24,13 @@ export interface Props {
   type?: string;
   noindex?: boolean;
   siteName?: string;
+  /**
+   * schema.org data for this page, one object or several. Rendered as
+   * application/ld+json. This is how a page states what it IS — a
+   * SoftwareApplication with its offers, an FAQPage, an Organization —
+   * which is the part answer engines quote and rich results read.
+   */
+  jsonLd?: object | object[];
 }
 
 const {
@@ -34,6 +41,7 @@ const {
   type = 'website',
   noindex = true,
   siteName,
+  jsonLd,
 } = Astro.props;
 
 // Astro.site comes from the `site` key in astro.config, so the canonical always
@@ -42,6 +50,10 @@ const {
 const base = Astro.site ?? new URL(Astro.url.origin);
 const href = new URL(canonical ?? Astro.url.pathname, base).href;
 const imageHref = image ? new URL(image, base).href : null;
+
+const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+// `<` escaped so a string inside the data cannot close the script element.
+const serialiseJsonLd = (obj: object) => JSON.stringify(obj).replace(/</g, '\\u003c');
 ---
 
 {noindex && <meta name="robots" content="noindex" />}
@@ -53,9 +65,24 @@ const imageHref = image ? new URL(image, base).href : null;
 <meta property="og:url" content={href} />
 {description && <meta property="og:description" content={description} />}
 {siteName && <meta property="og:site_name" content={siteName} />}
-{imageHref && <meta property="og:image" content={imageHref} />}
+{imageHref && (
+  <>
+    <meta property="og:image" content={imageHref} />
+    {/* Dimensions let a client reserve the card's space before the image
+        arrives, and several refuse a large card without them. */}
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={siteName ?? title} />
+  </>
+)}
 
 <meta name="twitter:card" content={imageHref ? 'summary_large_image' : 'summary'} />
 <meta name="twitter:title" content={title} />
 {description && <meta name="twitter:description" content={description} />}
 {imageHref && <meta name="twitter:image" content={imageHref} />}
+
+{/* is:inline because this is data, not a module: Astro must emit the JSON
+    verbatim rather than treating it as a script to process and bundle. */}
+{jsonLdBlocks.map((block) => (
+  <script is:inline type="application/ld+json" set:html={serialiseJsonLd(block)} />
+))}
