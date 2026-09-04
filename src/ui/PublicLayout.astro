@@ -6,10 +6,15 @@
  * Presentation only: branding and analytics ids come from the consuming portal.
  */
 import Analytics from "@vercel/analytics/astro";
+import SeoHead from "./SeoHead.astro";
 
 interface Props {
   title: string;
   description?: string;
+  /** Social card image, root-relative or absolute. */
+  socialImage?: string;
+  /** Set true to keep a public-shell page out of the index. Rare. */
+  noindex?: boolean;
   /** Appended to the page title: "<title> - <titleSuffix>". */
   titleSuffix?: string;
   lang?: string;
@@ -19,6 +24,8 @@ interface Props {
 const {
   title,
   description = '',
+  socialImage,
+  noindex = false,
   titleSuffix = 'KnowledgeBricks',
   lang = 'en',
   analytics = {},
@@ -31,7 +38,13 @@ const {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} — {titleSuffix}</title>
-  {description && <meta name="description" content={description} />}
+  <SeoHead
+    title={`${title} — ${titleSuffix}`}
+    description={description}
+    image={socialImage}
+    noindex={noindex}
+    siteName={titleSuffix}
+  />
   <link rel="icon" href="/favicon.png" type="image/png" />
 
   <!-- Fonts -->

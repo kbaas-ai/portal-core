@@ -23,6 +23,7 @@ import Analytics from "@vercel/analytics/astro";
 import type { PortalNav, PortalNavItem } from './portal-nav.ts';
 import { isActiveHref, isItemActive, currentActFor } from './portal-nav.ts';
 import type { AccentPalette } from './accent-color.ts';
+import SeoHead from './SeoHead.astro';
 
 export interface PortalBrand {
   /** Appended to the page title: "<title> — <titleSuffix>". */
@@ -50,6 +51,16 @@ export interface PortalOrgContext {
 
 interface Props {
   title: string;
+  /** Meta description. Only meaningful on a page that also sets `indexable`. */
+  description?: string;
+  /**
+   * Opt this page into indexing. Defaults false, so the portal shell stays
+   * noindex as it always has and no consuming portal changes behaviour by
+   * upgrading core. A public marketing page passes true.
+   */
+  indexable?: boolean;
+  /** Social card image for this page, root-relative or absolute. */
+  socialImage?: string;
   isSignedIn?: boolean;
   /** Built by the portal — see @core/ui/portal-nav for the shape. */
   nav: PortalNav;
@@ -73,6 +84,9 @@ interface Props {
 
 const {
   title,
+  description = '',
+  indexable = false,
+  socialImage,
   isSignedIn = false,
   nav,
   bottomNav = [],
@@ -110,7 +124,13 @@ const defaultLockHref = isTenant ? '/start' : '/pricing?upgrade=principal';
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} — {brand.titleSuffix}</title>
-  <meta name="robots" content="noindex" />
+  <SeoHead
+    title={`${title} — ${brand.titleSuffix}`}
+    description={description}
+    image={socialImage}
+    noindex={!indexable}
+    siteName={brand.titleSuffix}
+  />
   <link rel="icon" href="/favicon.png" type="image/png" />
   <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
