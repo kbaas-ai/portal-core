@@ -24,6 +24,7 @@ import type { PortalNav, PortalNavItem } from './portal-nav.ts';
 import { isActiveHref, isItemActive, currentActFor } from './portal-nav.ts';
 import type { AccentPalette } from './accent-color.ts';
 import SeoHead from './SeoHead.astro';
+import { FONT_FACE_CSS } from "./fonts.ts";
 
 export interface PortalBrand {
   /** Appended to the page title: "<title> — <titleSuffix>". */
@@ -143,10 +144,13 @@ const defaultLockHref = isTenant ? '/start' : '/pricing?upgrade=principal';
     siteName={brand.titleSuffix}
   />
   <link rel="icon" href="/favicon.png" type="image/png" />
-  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
-  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-sans@400,500,600,700&display=swap" />
-  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=geist-mono@400,500&display=swap" />
+  <!-- Fonts: self-hosted variable woff2, declared inline. Replaces two
+       render-blocking third-party stylesheets; see ./fonts.ts for why. -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="/fonts/instrument-sans-latin-wght-normal.woff2" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="/fonts/geist-mono-latin-wght-normal.woff2" />
+  <style is:inline set:html={FONT_FACE_CSS}></style>
   <Analytics />
   {import.meta.env.PROD && analytics.clarityId && (
     <script is:inline set:html={`(function(c,l,a,r,i,t,y){
@@ -435,6 +439,10 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
 
 <style is:global>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* See PublicLayout: <html> had no background, so navigation gaps flashed
+     white against the portal ground. */
+  html { background: var(--portal-bg, #f9fafb); }
 
   /* ── Design tokens ─────────────────────────────────────── */
   :root {

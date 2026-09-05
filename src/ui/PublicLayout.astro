@@ -7,6 +7,7 @@
  */
 import Analytics from "@vercel/analytics/astro";
 import SeoHead from "./SeoHead.astro";
+import { FONT_FACE_CSS } from "./fonts.ts";
 
 interface Props {
   title: string;
@@ -58,11 +59,13 @@ const {
   />
   <link rel="icon" href="/favicon.png" type="image/png" />
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
-  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=instrument-sans@400,500,600,700&display=swap" />
-  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=geist-mono@400,500&display=swap" />
+  <!-- Fonts: self-hosted variable woff2, declared inline. Replaces two
+       render-blocking third-party stylesheets; see ./fonts.ts for why. -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="/fonts/instrument-sans-latin-wght-normal.woff2" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+        href="/fonts/geist-mono-latin-wght-normal.woff2" />
+  <style is:inline set:html={FONT_FACE_CSS}></style>
 
   <Analytics />
 
@@ -97,6 +100,12 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
 
 <style is:global>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* The root element carried no background, so the moment between a
+     navigation starting and the new document painting flashed white against
+     an off-white page. Paint the ground on <html> so any such gap is the
+     page colour. */
+  html { background: var(--lp-bg, #F7F8FC); }
 
   :root {
     /* Design tokens */
