@@ -61,7 +61,7 @@ export interface TeamManagerProps {
 
 function roleLabel(r: string): string { return r === ROLE_ADMIN ? 'Admin' : 'Member'; }
 function fmt(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function memberName(m: Member): string {
@@ -158,7 +158,7 @@ export default function TeamManager({ seatPricing = null }: TeamManagerProps = {
     if (!seatPricing) return;
     const total = seatPricing.yearlyPrice(n).toLocaleString('en-US');
     const prorated = seats != null && n > seats ? ' The increase is prorated and charged now.' : '';
-    if (!confirm(`Set ${n} seats — $${total}/year at renewal.${prorated}`)) return;
+    if (!confirm(`Set ${n} seats ($${total}/year at renewal).${prorated}`)) return;
     setErr(null);
     setSavingSeats(true);
     try {
@@ -240,7 +240,7 @@ export default function TeamManager({ seatPricing = null }: TeamManagerProps = {
           </div>
           {atCap && (
             <p style={{ fontSize: '0.78rem', color: '#B8860B', margin: '0.6rem 0 0' }}>
-              Seat limit reached — all {seats} seats are in use (including pending invites).{seatPricing ? ' Add seats above to invite more people.' : ''}
+              Seat limit reached: all {seats} seats are in use (including pending invites).{seatPricing ? ' Add seats above to invite more people.' : ''}
             </p>
           )}
         </div>
@@ -262,7 +262,7 @@ export default function TeamManager({ seatPricing = null }: TeamManagerProps = {
             return (
               <tr key={m.userId}>
                 <td style={CELL}>{memberName(m)}{isSelf ? ' (you)' : ''}</td>
-                <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{m.email ?? '—'}</td>
+                <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{m.email ?? '-'}</td>
                 <td style={CELL}>
                   {isAdmin && !isSelf ? (
                     <select value={m.role} onChange={(e) => changeRole(m.userId, e.target.value)}
@@ -301,7 +301,7 @@ export default function TeamManager({ seatPricing = null }: TeamManagerProps = {
             <tbody>
               {invitations.map((i) => (
                 <tr key={i.id}>
-                  <td style={CELL}>{i.email ?? '—'}</td>
+                  <td style={CELL}>{i.email ?? '-'}</td>
                   <td style={CELL}>{roleLabel(i.role)}</td>
                   <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{fmt(i.createdAt)}</td>
                   {isAdmin && (

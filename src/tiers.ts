@@ -67,20 +67,20 @@ export const TIERS: readonly TierConfig[] = [
     slug: "advisor", displayName: "Advisor", status: "retired",
     ...flat(4900, 49000), monthlyQueryLimit: 50, unlocksProContent: true,
     stripeProductDescription:
-      "Advisor — 50 queries/month and the full practitioner content library.",
+      "Advisor: 50 queries/month and the full practitioner content library.",
   },
   {
     slug: "principal", displayName: "Principal", status: "active",
     ...flat(9900), monthlyQueryLimit: 9999, unlocksProContent: true,
     stripeProductDescription:
-      "Principal — unlimited queries, full content library, and every practitioner skill.",
+      "Principal: unlimited queries, full content library, and every practitioner skill.",
   },
   {
     slug: "team", displayName: "Team", status: "active",
     pricing: { kind: "seat", seatCents: 70800, minSeats: 5, interval: "year" }, // $59/user/mo × 12
     monthlyQueryLimit: 9999, unlocksProContent: true,
     stripeProductDescription:
-      "Team — everything in Principal plus collaboration, API, Lessons Learned, onboarding pathways, and private-vault distillation. Billed annually per seat.",
+      "Team: everything in Principal plus collaboration, API, Lessons Learned, onboarding pathways, and private-vault distillation. Billed annually per seat.",
   },
   {
     // Retired 2026-09-03: folded into Team. Slug kept for existing

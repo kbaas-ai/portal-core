@@ -133,9 +133,9 @@ const defaultLockHref = isTenant ? '/start' : '/pricing?upgrade=principal';
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{title} — {brand.titleSuffix}</title>
+  <title>{title} | {brand.titleSuffix}</title>
   <SeoHead
-    title={`${title} — ${brand.titleSuffix}`}
+    title={`${title} | ${brand.titleSuffix}`}
     description={description}
     image={socialImage}
     canonical={canonical}
@@ -346,7 +346,7 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
       </div>
       <div class="portal-topbar-right">
         {isSignedIn && isTenant && (
-          <span class="portal-kb-badge" title="Enterprise knowledge base — your organization's dedicated private workspace">
+          <span class="portal-kb-badge" title="Enterprise knowledge base: your organization's dedicated private workspace">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="11" width="18" height="11" rx="2"/>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -840,6 +840,7 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
   }
   .portal-topbar-left {
     display: flex; align-items: center; gap: 0.75rem;
+    min-width: 0; overflow: hidden;
   }
   .portal-hamburger {
     display: none;
@@ -864,6 +865,16 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
   }
   .portal-topbar-right {
     display: flex; align-items: center; gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  .portal-hamburger { flex: none; }
+  .portal-signin-link { white-space: nowrap; }
+  @media (max-width: 480px) {
+    .portal-topbar { padding: 0 0.75rem; }
+    .portal-topbar-left { gap: 0.375rem; }
+    .portal-topbar-right { gap: 0.25rem; }
+    .portal-topbar-logo-img { max-width: 100%; height: auto; max-height: 24px; }
+    .portal-topbar-wordmark { min-width: 0; }
   }
   /* Tint the Clerk user avatar ring with the org accent. */
   .portal-topbar-right .cl-avatarBox,

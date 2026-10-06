@@ -42,7 +42,7 @@ function Card({ stat, label, sub }: { stat: React.ReactNode; label: string; sub?
 
 function breakdown(rec: Record<string, number>): string {
   const entries = Object.entries(rec).sort((a, b) => b[1] - a[1]);
-  return entries.length ? entries.map(([k, v]) => `${k}: ${v}`).join(' · ') : '—';
+  return entries.length ? entries.map(([k, v]) => `${k}: ${v}`).join(' · ') : '-';
 }
 
 const SECTION_H: React.CSSProperties = {
@@ -129,7 +129,7 @@ export default function AdminAnalytics() {
       </div>
 
       <div>
-        <h2 style={SECTION_H}>Demand — last 30 days</h2>
+        <h2 style={SECTION_H}>Demand: last 30 days</h2>
         {data.demand ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <div style={grid}>
@@ -137,23 +137,23 @@ export default function AdminAnalytics() {
               <Card stat={data.demand.unanswered} label="Unanswered (content gaps)" sub={data.demand.unanswered > 0 ? 'vault couldn’t answer these' : undefined} />
               <Card stat={data.demand.locked} label="Paywall hits" sub={data.demand.locked > 0 ? 'under-tier users blocked by a skill match' : undefined} />
               <Card
-                stat={data.demand.topSlugs[0]?.slug ?? '—'}
+                stat={data.demand.topSlugs[0]?.slug ?? '-'}
                 label="Top matched skill"
                 sub={data.demand.topSlugs.slice(0, 5).map(s => `${s.slug}: ${s.count}`).join(' · ') || undefined}
               />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.85rem' }}>
-              <QuestionList title="Recent unanswered" items={data.demand.recentUnanswered} empty="No unanswered questions — the vault is keeping up." />
+              <QuestionList title="Recent unanswered" items={data.demand.recentUnanswered} empty="No unanswered questions. The vault is keeping up." />
               <QuestionList title="Recent paywall hits" items={data.demand.recentLocked} empty="No paywall friction in the window." />
             </div>
           </div>
         ) : (
-          <p style={SUB}>Demand stats unavailable (questions query failed — check logs).</p>
+          <p style={SUB}>Demand stats unavailable (questions query failed, check logs).</p>
         )}
       </div>
 
       <div>
-        <h2 style={SECTION_H}>Tool usage — last 30 days</h2>
+        <h2 style={SECTION_H}>Tool usage: last 30 days</h2>
         {data.toolUsage ? (
           Object.keys(data.toolUsage).length === 0 ? (
             <p style={SUB}>No calculator runs recorded yet (telemetry started 2026-07-13).</p>
@@ -165,7 +165,7 @@ export default function AdminAnalytics() {
             </div>
           )
         ) : (
-          <p style={SUB}>Tool usage unavailable (tool_usage query failed — check logs).</p>
+          <p style={SUB}>Tool usage unavailable (tool_usage query failed, check logs).</p>
         )}
       </div>
     </div>

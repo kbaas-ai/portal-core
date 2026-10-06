@@ -44,7 +44,7 @@ interface ClerkComp { userId: string; email: string | null; tier: string; status
 const TIERS = ['advisor', 'principal', 'team', 'enterprise'];
 
 function fmt(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function expired(iso: string | null): boolean { return !!iso && new Date(iso) < new Date(); }
@@ -162,7 +162,7 @@ export default function CompManager() {
                   <td style={CELL}>{u.tier}</td>
                   <td style={CELL}>{u.type}</td>
                   <td style={{ ...CELL, color: expired(u.expires_at) ? '#C0392B' : 'var(--lp-steel)' }}>{fmt(u.expires_at)}{expired(u.expires_at) ? ' (expired)' : ''}</td>
-                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{u.notes ?? '—'}</td>
+                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{u.notes ?? '-'}</td>
                   <td style={{ ...CELL, textAlign: 'right' }}><button onClick={() => revoke('user', u.id)} style={{ ...BTN_GHOST, color: '#C0392B' }}>Revoke</button></td>
                 </tr>
               ))}
@@ -180,7 +180,7 @@ export default function CompManager() {
                   <td style={CELL}>{d.tier}</td>
                   <td style={CELL}>{d.type}</td>
                   <td style={{ ...CELL, color: expired(d.expires_at) ? '#C0392B' : 'var(--lp-steel)' }}>{fmt(d.expires_at)}{expired(d.expires_at) ? ' (expired)' : ''}</td>
-                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{d.note ?? '—'}</td>
+                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{d.note ?? '-'}</td>
                   <td style={{ ...CELL, textAlign: 'right' }}><button onClick={() => revoke('domain', d.domain)} style={{ ...BTN_GHOST, color: '#C0392B' }}>Revoke</button></td>
                 </tr>
               ))}
@@ -201,7 +201,7 @@ export default function CompManager() {
                 <tr key={c.userId}>
                   <td style={CELL}>{c.email ?? c.userId}</td>
                   <td style={CELL}>{c.tier}</td>
-                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{c.status ?? '—'}</td>
+                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{c.status ?? '-'}</td>
                   <td style={{ ...CELL, textAlign: 'right' }}><button onClick={() => clearClerk(c.userId, c.email)} style={{ ...BTN_GHOST, color: '#C0392B' }}>Clear</button></td>
                 </tr>
               ))}

@@ -66,7 +66,7 @@ const EMPTY_FORM: Form = {
 };
 
 function fmt(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
@@ -194,8 +194,8 @@ export default function TenantManager() {
                   <td style={{ ...CELL, fontFamily: 'var(--lp-font-mono)', fontSize: '0.78rem' }}>{t.slug}</td>
                   <td style={CELL}>{t.company_name}</td>
                   <td style={{ ...CELL, color: STATUS_COLOR[t.status] ?? 'var(--lp-steel)', fontWeight: 600 }}>{t.status}</td>
-                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{t.clerk_org_id ?? '—'}</td>
-                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{t.vault_repo ?? '—'}</td>
+                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{t.clerk_org_id ?? '-'}</td>
+                  <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{t.vault_repo ?? '-'}</td>
                   <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{fmt(t.onboarded_at)}</td>
                   <td style={{ ...CELL, textAlign: 'right' }}>
                     <button onClick={() => startEdit(t)} style={BTN_GHOST}>Edit</button>

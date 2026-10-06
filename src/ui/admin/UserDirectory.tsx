@@ -35,7 +35,7 @@ const BTN_GHOST: React.CSSProperties = {
 interface UserRow { id: string; name: string; email: string | null; ownTier: string | null; createdAt: string | null; }
 
 function fmt(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
@@ -80,7 +80,7 @@ export default function UserDirectory() {
       {!loading && (
         <p style={{ fontSize: '0.78rem', color: 'var(--lp-steel)', margin: '0 0 0.5rem' }}>
           {users.length} shown{total > users.length ? ` of ${total} matching` : ''}. Tier shown is the user's own
-          metadata — click <strong>Inspect</strong> for the authoritative effective tier.
+          metadata. Click <strong>Inspect</strong> for the authoritative effective tier.
         </p>
       )}
 
@@ -95,8 +95,8 @@ export default function UserDirectory() {
           {users.map((u) => (
             <tr key={u.id}>
               <td style={CELL}>{u.name}</td>
-              <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{u.email ?? '—'}</td>
-              <td style={CELL}>{u.ownTier ?? '—'}</td>
+              <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{u.email ?? '-'}</td>
+              <td style={CELL}>{u.ownTier ?? '-'}</td>
               <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{fmt(u.createdAt)}</td>
               <td style={{ ...CELL, textAlign: 'right', whiteSpace: 'nowrap' }}>
                 {u.email && (

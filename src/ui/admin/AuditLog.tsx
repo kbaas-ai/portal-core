@@ -34,9 +34,9 @@ interface Entry {
 }
 
 function summarizeDetails(d: Record<string, unknown> | null): string {
-  if (!d || Object.keys(d).length === 0) return '—';
+  if (!d || Object.keys(d).length === 0) return '-';
   return Object.entries(d)
-    .map(([k, v]) => `${k}: ${v === null || v === undefined ? '—' : String(v)}`)
+    .map(([k, v]) => `${k}: ${v === null || v === undefined ? '-' : String(v)}`)
     .join(', ');
 }
 
@@ -112,8 +112,8 @@ export default function AuditLog() {
                 <td style={{ ...CELL, ...MONO }}>{e.action}</td>
                 <td style={CELL}>
                   {e.target_kind || e.target_id
-                    ? `${e.target_kind ?? '—'}${e.target_id ? `: ${e.target_id}` : ''}`
-                    : '—'}
+                    ? `${e.target_kind ?? '-'}${e.target_id ? `: ${e.target_id}` : ''}`
+                    : '-'}
                 </td>
                 <td style={{ ...CELL, color: 'var(--lp-steel)' }}>{summarizeDetails(e.details)}</td>
               </tr>

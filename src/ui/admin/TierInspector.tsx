@@ -89,18 +89,18 @@ export default function TierInspector() {
       {result && (
         <div>
           <p style={{ fontSize: '0.9rem', margin: '0 0 0.75rem' }}>
-            <strong>{result.email}</strong>{!result.found && ' (no Clerk account)'} — effective tier:{' '}
+            <strong>{result.email}</strong>{!result.found && ' (no Clerk account)'}, effective tier:{' '}
             <strong style={{ color: 'var(--lp-indigo)' }}>{result.effectiveTier}</strong>
             {' '}(source: {result.winningSource})
           </p>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={TH}>Source</th><th style={TH}>Value</th></tr></thead>
             <tbody>
-              {row('Clerk user metadata', result.breakdown.clerkUser ? `${result.breakdown.clerkUser.tier ?? '—'} (status: ${result.breakdown.clerkUser.status ?? '—'})` : '—', result.winningSource === 'clerkUser')}
-              {row('Org metadata', result.breakdown.org ? (result.breakdown.org.tier ?? '—') : '—', result.winningSource === 'org')}
-              {row('Comped user', result.breakdown.compUser ? `${result.breakdown.compUser.tier} (${result.breakdown.compUser.type}${result.breakdown.compUser.expires_at ? `, expires ${result.breakdown.compUser.expires_at.slice(0, 10)}` : ''})` : '—', result.winningSource === 'compUser')}
-              {row('Comped domain', result.breakdown.compDomain ? `${result.breakdown.compDomain.tier} (${result.breakdown.compDomain.type}${result.breakdown.compDomain.expires_at ? `, expires ${result.breakdown.compDomain.expires_at.slice(0, 10)}` : ''})` : '—', result.winningSource === 'compDomain')}
-              {row('Campaign trial', result.breakdown.trial?.until ? `${result.breakdown.trial.active ? 'active' : 'expired'} (until ${new Date(result.breakdown.trial.until).toLocaleDateString()})` : '—', result.winningSource === 'trial')}
+              {row('Clerk user metadata', result.breakdown.clerkUser ? `${result.breakdown.clerkUser.tier ?? '-'} (status: ${result.breakdown.clerkUser.status ?? '-'})` : '-', result.winningSource === 'clerkUser')}
+              {row('Org metadata', result.breakdown.org ? (result.breakdown.org.tier ?? '-') : '-', result.winningSource === 'org')}
+              {row('Comped user', result.breakdown.compUser ? `${result.breakdown.compUser.tier} (${result.breakdown.compUser.type}${result.breakdown.compUser.expires_at ? `, expires ${result.breakdown.compUser.expires_at.slice(0, 10)}` : ''})` : '-', result.winningSource === 'compUser')}
+              {row('Comped domain', result.breakdown.compDomain ? `${result.breakdown.compDomain.tier} (${result.breakdown.compDomain.type}${result.breakdown.compDomain.expires_at ? `, expires ${result.breakdown.compDomain.expires_at.slice(0, 10)}` : ''})` : '-', result.winningSource === 'compDomain')}
+              {row('Campaign trial', result.breakdown.trial?.until ? `${result.breakdown.trial.active ? 'active' : 'expired'} (until ${new Date(result.breakdown.trial.until).toLocaleDateString()})` : '-', result.winningSource === 'trial')}
             </tbody>
           </table>
         </div>

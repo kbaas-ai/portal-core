@@ -96,7 +96,7 @@ export async function clearClerkComp(userId: string, cfg: AdminConfig): Promise<
   const meta = (user.publicMetadata || {}) as Record<string, unknown>;
   const c = classifyClerkUserTier(meta, cfg);
   if (c.billingBacked) {
-    throw new CompGuardError('This tier is backed by a Stripe subscription — clear it from billing, not here.');
+    throw new CompGuardError('This tier is backed by a Stripe subscription: clear it from billing, not here.');
   }
   if (!c.isManualComp) {
     throw new CompGuardError('This user has no manual Clerk comp to clear.');
