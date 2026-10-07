@@ -88,6 +88,12 @@ interface Props {
   poweredByLabel?: string;
   /** Top-bar help link. Pass null to omit it on portals with no help centre. */
   helpHref?: string | null;
+  /**
+   * Render the top-bar title as an h1 (default). Pages that own their own h1
+   * pass false and the title becomes a paragraph with the same styling, so the
+   * page keeps exactly one h1.
+   */
+  titleAsHeading?: boolean;
 }
 
 const {
@@ -110,6 +116,7 @@ const {
   poweredByHref = 'https://www.knowledgebricks.com',
   poweredByLabel = 'KnowledgeBricks',
   helpHref = '/help',
+  titleAsHeading = true,
 } = Astro.props;
 
 const labels = { signIn: 'Sign in', help: 'Help', ...labelsProp };
@@ -342,7 +349,9 @@ window._linkedin_data_partner_ids.push(_linkedin_partner_id);
         <span class="portal-topbar-wordmark">
           <img src={brand.wordmarkSrc} alt={brand.titleSuffix} class="portal-topbar-logo-img" />
         </span>
-        <h1 class="portal-topbar-title">{title}</h1>
+        {titleAsHeading
+          ? <h1 class="portal-topbar-title">{title}</h1>
+          : <p class="portal-topbar-title">{title}</p>}
       </div>
       <div class="portal-topbar-right">
         {isSignedIn && isTenant && (
